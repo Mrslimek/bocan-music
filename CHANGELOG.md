@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - Quitting with Command-Q is now immediate. Bòcan used to pause for a second or two while it saved your place in the current track; it still remembers where you were, but it no longer makes you wait.
+- If quitting ever takes longer than usual, Bòcan now shows a small Quitting message while it finishes saving your place.
 
 ## [2.23.0](https://github.com/bocan/bocan-music/compare/v2.22.1...v2.23.0) (2026-10-18)
 

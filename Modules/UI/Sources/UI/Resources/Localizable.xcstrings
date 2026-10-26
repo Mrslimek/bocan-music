@@ -19030,6 +19030,22 @@
         }
       }
     },
+    "Quitting…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitting…"
+          }
+        },
+        "en-XA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qúíţţíñĝ… one"
+          }
+        }
+      }
+    },
     "RSS Feed" : {
       "localizations" : {
         "en-XA" : {

@@ -40,6 +40,14 @@ struct QuitPathTests {
         #expect(app.contains("shutdownTimeout"))
     }
 
+    @Test("The progress panel is delayed so a normal quit does not flash it")
+    func quittingPanelIsDelayed() throws {
+        let app = try self.appSource("App/BocanApp.swift")
+        #expect(app.contains("quittingPanelDelay"))
+        #expect(app.contains("shutdownTimeout"))
+        #expect(app.contains("panel.show()"))
+    }
+
     @Test("Playback position, Phone Sync and vacuum still run on quit")
     func shutdownKeepsExistingWork() throws {
         let lifecycle = try self.appSource("App/Lifecycle.swift")

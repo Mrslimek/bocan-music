@@ -124,9 +124,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     /// Runs the shutdown work with a bounded wait, then lets AppKit terminate.
+    ///
+    /// The progress panel is delayed: normal quits finish in milliseconds, and a
+    /// spinner that appears and disappears in the same frame reads as a flicker.
     private func beginTermination(_ shutdown: AppShutdown) {
         Task { @MainActor in
+            let panel = QuittingPanelController()
+            let showPanel = Task { @MainActor in
+                try? await Task.sleep(for: Self.quittingPanelDelay)
+                guard !Task.isCancelled else { return }
+                panel.show()
+            }
+
             let finished = await shutdown.performWithTimeout(Self.shutdownTimeout)
+
+            showPanel.cancel()
+            panel.close()
 
             if !finished {
                 self.log.warning("app.quit.shutdown_timeout")
@@ -136,6 +149,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
     }
 
+    /// How long quit-time work may take before the progress panel appears.
+    private static let quittingPanelDelay: Duration = .milliseconds(300)
     /// Hard bound on quit-time work. The process exits even if a step is stuck.
     private static let shutdownTimeout: Duration = .seconds(2)
 
