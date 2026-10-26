@@ -91,7 +91,8 @@ extension QueuePlayer {
     /// Captures the current engine position to `UserDefaults` so the next launch
     /// can seek the restored track to where the user left off.
     ///
-    /// Call this from `applicationWillTerminate` (or the equivalent notification).
+    /// Call this from the app's quit work before the process exits (the App
+    /// target's `AppShutdown`). Never from a blocking `willTerminate` observer.
     /// Safe to call when nothing is playing — it is a no-op when position is zero.
     public func savePositionForSuspend() async {
         // A podcast item persists its per-episode position through the resolver,

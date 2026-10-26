@@ -60,7 +60,7 @@ UI is the only module that imports `AppKit`. A lower module that wants an AppKit
 ## Concurrency
 
 - Public APIs that do async work are `async throws` and annotated `Sendable` where relevant.
-- Long-lived state is owned by `actor`s, not classes with locks. A lock, a serial queue or a semaphore is allowed only where a synchronous boundary forbids an actor hop: a delegate or TLS verify callback, a synchronous `@Sendable` closure, a synchronous API that an actor and the main actor both call (`PresetStore`), app termination (with a timeout), GPU frame pacing, or the log sink. The site carries a comment that gives the reason.
+- Long-lived state is owned by `actor`s, not classes with locks. A lock, a serial queue or a semaphore is allowed only where a synchronous boundary forbids an actor hop: a delegate or TLS verify callback, a synchronous `@Sendable` closure, a synchronous API that an actor and the main actor both call (`PresetStore`), GPU frame pacing, or the log sink. The site carries a comment that gives the reason. App termination is not one of those boundaries: return `.terminateLater` and await the work instead, because blocking main there deadlocks against `UserDefaults` delivery (see `docs/GOTCHAS.md`).
 - `@MainActor` everything touching SwiftUI view state.
 - No `DispatchQueue.global().async` in new code. Use `Task` or `TaskGroup`.
 - Cancellation is respected: every loop over an `AsyncSequence` or long operation checks `Task.checkCancellation()`.

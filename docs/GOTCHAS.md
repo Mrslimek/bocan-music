@@ -363,6 +363,20 @@ Reading defaults reads the release app's preferences only.
 
 ---
 
+## App lifecycle and termination
+
+### Blocking the main thread while saving defaults at quit deadlocks for the full timeout
+
+**Problem:** every Command-Q pauses for two seconds before the app disappears. A process sample shows the main thread in `semaphore_wait_trap`, and the quit task in `-[NSOperation waitUntilFinished]` under `UserDefaults.set`.
+
+**Rule:** never wait synchronously in `applicationWillTerminate` or in a `willTerminateNotification` observer for async work. Return `.terminateLater` from `applicationShouldTerminate`, run the work from a `Task` while the main thread stays free, and call `NSApp.reply(toApplicationShouldTerminate:)` when it finishes. Keep each step idempotent and bound the wait.
+
+**Why:** `UserDefaults` posts `NSUserDefaultsDidChangeNotification` on the writer's thread. SwiftUI's `UserDefaultObserver` handles it through an operation that needs the main queue and waits for it. If the main thread is parked in a semaphore, that wait cannot finish, so the quit blocks until the semaphore times out. `savePositionForSuspend()` writes `UserDefaults`, which makes the old handler a guaranteed self-deadlock rather than a slow disk.
+
+**Canonical file:** `App/Lifecycle.swift` (`AppShutdown.performWithTimeout`), called from `AppDelegate.applicationShouldTerminate` in `App/BocanApp.swift`
+
+---
+
 ## Testing
 
 ### The XCUITest runner is sandboxed no matter what the project says

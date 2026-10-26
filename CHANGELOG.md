@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Quitting with Command-Q is now immediate. Bòcan used to pause for a second or two while it saved your place in the current track; it still remembers where you were, but it no longer makes you wait.
+
 ## [2.23.0](https://github.com/bocan/bocan-music/compare/v2.22.1...v2.23.0) (2026-10-18)
 
 - Every podcast episode you have downloaded now has a home of its own. Choose Downloaded in the new switch at the top of the Podcasts page to see them all in one list, from every show. Pick one show, click a column heading to sort by episode, show, date or length, or group them by show, and Play All puts every one you have not finished into Up Next in that order. Right-click any episode, here or on a show's page, to choose Play Next or Add to Queue. Thanks for the idea @GitMyAccount.

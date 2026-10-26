@@ -73,6 +73,7 @@
 		3FBAE21A6B8E3660354E7B87 /* PodcastSettingsWiringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F29CF06D29AEC181B5466B6 /* PodcastSettingsWiringTests.swift */; };
 		4025CAA605E04B878F1B83A2 /* SafeHTMLRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC12CBAF684C255C24BC6127 /* SafeHTMLRendererTests.swift */; };
 		4048626C7584950E6D201081 /* LaunchSanity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DE49AE8BEADA5F7A3D8406 /* LaunchSanity.swift */; };
+		42C326A7C4F48E5B935EBB43 /* QuitPathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D709EBD62F127FD982D9C46F /* QuitPathTests.swift */; };
 		441B3381BCAFD513AD0594E8 /* RadioViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CAD09E45371E22ED0901715 /* RadioViewModelTests.swift */; };
 		46B88126867F417C1F626EFA /* LogConsoleAppConventionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9F3ECEBA0831D7E932406AE /* LogConsoleAppConventionTests.swift */; };
 		472F09D4CECA1194874690E1 /* NewPlaylistSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FB88D60D5A16EA8C9A6D524 /* NewPlaylistSelectionTests.swift */; };
@@ -515,6 +516,7 @@
 		D336D59F9188111951FCC5DF /* SubsonicAnnotationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubsonicAnnotationCoordinatorTests.swift; sourceTree = "<group>"; };
 		D3FA0EB21BFC45A22F1C61E1 /* L10nTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = L10nTests.swift; sourceTree = "<group>"; };
 		D5790CEA86695376C027157D /* PodcastFundingConventionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PodcastFundingConventionTests.swift; sourceTree = "<group>"; };
+		D709EBD62F127FD982D9C46F /* QuitPathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuitPathTests.swift; sourceTree = "<group>"; };
 		D83A27BDC0A44ED576CBDE8C /* LaunchAtLoginController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginController.swift; sourceTree = "<group>"; };
 		D9B5B3110CE7BC30E8122BE8 /* UI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = UI; path = Modules/UI; sourceTree = SOURCE_ROOT; };
 		DC354A988BB081B63DC6024A /* E2EStreamServerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EStreamServerTests.swift; sourceTree = "<group>"; };
@@ -555,7 +557,7 @@
 		FD18A2E69E819F5845E511F3 /* UpdateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateController.swift; sourceTree = "<group>"; };
 		FE67437858D66E54A636A323 /* PhoneSyncViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneSyncViewModelTests.swift; sourceTree = "<group>"; };
 		FEA827D3E6864D7D11A6F8BE /* BocanCommands+CollectionViewMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BocanCommands+CollectionViewMenu.swift"; sourceTree = "<group>"; };
-		"TEMP_A546A820-FF1B-4418-8FB7-7289054A6FB6" /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+		"TEMP_B0CC5530-AECD-43A3-9A5E-B02A5DF6B834" /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1063,6 +1065,7 @@
 				F7BCD10FC9FB02BCADD58FCB /* PhoneSyncWiringTests.swift */,
 				E0836073682140DAFDDD0B83 /* PodcastAutoDownloadWiringTests.swift */,
 				4F29CF06D29AEC181B5466B6 /* PodcastSettingsWiringTests.swift */,
+				D709EBD62F127FD982D9C46F /* QuitPathTests.swift */,
 				46711AA081CC4DFC72DFE251 /* RecentScrobblesSheetFlagTests.swift */,
 				5ED57792C57E833ECFCE6DC3 /* SettingsMenuTests.swift */,
 				3D1CAA6A918DE471019AB205 /* SingleInstanceTests.swift */,
@@ -1077,10 +1080,10 @@
 			path = AppTests;
 			sourceTree = "<group>";
 		};
-		"TEMP_ACBCAAC6-3479-4C81-AFD7-94E9E2535C6E" /* bocan-music */ = {
+		"TEMP_5D99E379-29E0-49DF-9A21-046A47454C8C" /* bocan-music */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_A546A820-FF1B-4418-8FB7-7289054A6FB6" /* Secrets.xcconfig */,
+				"TEMP_B0CC5530-AECD-43A3-9A5E-B02A5DF6B834" /* Secrets.xcconfig */,
 			);
 			path = "bocan-music";
 			sourceTree = "<group>";
@@ -1345,6 +1348,7 @@
 				9C0C47A081B6949BAE8CE16F /* ProvenanceBatchTests.swift in Sources */,
 				89BD8F709DD5D630E449B97D /* QueueReorderGripTests.swift in Sources */,
 				C7A80E3167450AFA86AB6A2B /* QuitGuardStateTests.swift in Sources */,
+				42C326A7C4F48E5B935EBB43 /* QuitPathTests.swift in Sources */,
 				ECA13424360831515F243CD3 /* RadioPlaybackTests.swift in Sources */,
 				98D147FA40C81BBC11286685 /* RadioSidebarConventionTests.swift in Sources */,
 				441B3381BCAFD513AD0594E8 /* RadioViewModelTests.swift in Sources */,
@@ -1536,7 +1540,7 @@
 		};
 		3E79DA1DC07FE3812FB54C0A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_A546A820-FF1B-4418-8FB7-7289054A6FB6" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_B0CC5530-AECD-43A3-9A5E-B02A5DF6B834" /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = arm64;
@@ -1673,7 +1677,7 @@
 		};
 		D3B7E2D650BF9AC5F77082BA /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_A546A820-FF1B-4418-8FB7-7289054A6FB6" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_B0CC5530-AECD-43A3-9A5E-B02A5DF6B834" /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = arm64;

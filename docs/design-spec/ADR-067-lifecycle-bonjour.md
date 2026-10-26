@@ -121,8 +121,10 @@ Never leave a Mac advertising `pm=1` at rest.
   App target because lower modules do not import AppKit). On `willSleep`, the
   listener may drop; on `didWake`, call `syncServer.reAdvertise()` so the service
   reappears. Re-advertising after wake is an acceptance criterion.
-- **Termination**: on `applicationWillTerminate` (via the existing termination
-  observer), `stop()` the server so the Bonjour service is withdrawn cleanly.
+- **Termination**: on quit, before AppKit terminates the process (the App
+  target's `AppShutdown`), `stop()` the server so the Bonjour service is
+  withdrawn cleanly. Do not block the main thread in a `willTerminate`
+  observer; see `docs/GOTCHAS.md`.
 
 ## Entitlements (already present, do not re-add)
 

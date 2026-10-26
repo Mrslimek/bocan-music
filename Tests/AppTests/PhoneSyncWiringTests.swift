@@ -19,6 +19,15 @@ struct PhoneSyncWiringTests {
         return try String(contentsOf: url, encoding: .utf8)
     }
 
+    private func lifecycleSource() throws -> String {
+        let url = URL(filePath: #filePath)
+            .deletingLastPathComponent() // AppTests/
+            .deletingLastPathComponent() // Tests/
+            .deletingLastPathComponent() // repo root
+            .appendingPathComponent("App/Lifecycle.swift")
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+
     @Test("SyncServer is a member of AppGraph")
     func syncServerInGraph() throws {
         let source = try self.appSource()
@@ -58,8 +67,8 @@ struct PhoneSyncWiringTests {
             "didWake must re-advertise the Bonjour service"
         )
         #expect(
-            source.contains("await syncServer.stop()"),
-            "willTerminate must withdraw the server"
+            try self.lifecycleSource().contains("await self.syncServer.stop()"),
+            "quit must withdraw the server"
         )
     }
 }

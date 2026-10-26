@@ -34,6 +34,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     var libraryViewModel: LibraryViewModel?
     var dspViewModel: DSPViewModel?
 
+    /// Set once the object graph exists. Quit-time work lives here so the
+    /// delegate can await it after returning `.terminateLater`, keeping the
+    /// main thread free while it runs.
+    var shutdown: AppShutdown?
+
+    /// Guards against a second termination request racing the first reply.
+    private var terminationInFlight = false
+    private let log = AppLogger.make(.app)
+
     // MARK: Lifecycle
 
     func applicationWillFinishLaunching(_: Notification) {
@@ -52,18 +61,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         SmokeCheck.startIfRequested()
     }
 
-    /// Intercepts ⌘Q when a scan or ReplayGain analysis is active.
+    /// Intercepts ⌘Q to save state asynchronously before the process exits.
     ///
-    /// Returns `.terminateLater` and shows a confirmation alert; the alert
-    /// calls `NSApp.reply(toApplicationShouldTerminate:)` when dismissed so
-    /// AppKit can proceed or cancel the quit.  Returns `.terminateNow`
-    /// immediately when nothing is running so normal quits are unaffected.
+    /// Always returns `.terminateLater` once the graph exists. The shutdown
+    /// work itself must not run in `applicationWillTerminate`: that callback is
+    /// synchronous, and blocking the main thread there deadlocks against
+    /// `UserDefaults` notification delivery (SwiftUI observes defaults).
+    /// Returning `.terminateLater` keeps the run loop free, and the work calls
+    /// `NSApp.reply(toApplicationShouldTerminate:)` when it finishes or when
+    /// its timeout expires.
+    ///
+    /// When a scan or ReplayGain analysis is active, a confirmation alert runs
+    /// first, so the listener can cancel before that work starts.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let shutdown = self.shutdown else { return .terminateNow }
+
+        guard !self.terminationInFlight else {
+            self.log.debug("app.quit.duplicate")
+            return .terminateCancel
+        }
+        self.terminationInFlight = true
+
         let isInitialScan = self.libraryViewModel?.isInitialScan == true
         let isScanning = isInitialScan || self.libraryViewModel?.isScanning == true
         let isAnalyzing = self.dspViewModel?.isAnalyzing == true
 
-        guard isScanning || isAnalyzing else { return .terminateNow }
+        guard isScanning || isAnalyzing else {
+            self.beginTermination(shutdown)
+            return .terminateLater
+        }
 
         let informativeText = if isInitialScan {
             "Your music library is being built for the first time. "
@@ -86,12 +112,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // Task defers the modal until after applicationShouldTerminate returns
         // .terminateLater; otherwise the nested run loop causes AppKit re-entrancy.
         Task { @MainActor in
-            let reply = alert.runModal() == .alertFirstButtonReturn
-            NSApp.reply(toApplicationShouldTerminate: reply)
+            guard alert.runModal() == .alertFirstButtonReturn else {
+                self.terminationInFlight = false
+                NSApp.reply(toApplicationShouldTerminate: false)
+                return
+            }
+            self.beginTermination(shutdown)
         }
 
         return .terminateLater
     }
+
+    /// Runs the shutdown work with a bounded wait, then lets AppKit terminate.
+    private func beginTermination(_ shutdown: AppShutdown) {
+        Task { @MainActor in
+            let finished = await shutdown.performWithTimeout(Self.shutdownTimeout)
+
+            if !finished {
+                self.log.warning("app.quit.shutdown_timeout")
+            }
+
+            NSApp.reply(toApplicationShouldTerminate: true)
+        }
+    }
+
+    /// Hard bound on quit-time work. The process exits even if a step is stuck.
+    private static let shutdownTimeout: Duration = .seconds(2)
 
     /// Called by AppKit immediately before the process exits.
     func applicationWillTerminate(_: Notification) {
@@ -1072,9 +1118,6 @@ extension BocanApp {
         // the `library.watchForChanges` preference).
         Task { [weak lvm] in await lvm?.startOrStopWatcher() }
 
-        // Persist playback position on quit so it can be restored on next launch.
-        registerTerminationObserver(player: qp, database: db)
-
         // ADR-067: the Phone Sync server. Constructed unconditionally so the
         // Settings toggle (22-8) can start/stop it, but only started here when
         // `sync.enabled` is on (default off). `serverName` is injected as a
@@ -1100,7 +1143,11 @@ extension BocanApp {
         )
         let phoneSyncViewModel = PhoneSyncViewModel(control: phoneSyncController)
         phoneSyncBridge.receiver = phoneSyncViewModel
-        Self.installSyncServerLifecycleObservers(syncServer: syncServer)
+        Self.installSyncServerWakeObserver(syncServer: syncServer)
+
+        // Save position, withdraw Phone Sync and vacuum before the process
+        // exits. The delegate awaits this after returning .terminateLater.
+        appDelegate.shutdown = AppShutdown(player: qp, database: db, syncServer: syncServer)
         if UserDefaults.standard.bool(forKey: "sync.enabled") {
             Task { [syncServer] in
                 do {
@@ -1161,27 +1208,17 @@ extension BocanApp {
     // swiftlint:enable function_body_length
 
     /// ADR-067: re-advertise Phone Sync after the system wakes (the listener
-    /// may drop its Bonjour service across sleep), and withdraw it cleanly on
-    /// quit. Only fires effect when the server is running; a no-op while off.
-    private static func installSyncServerLifecycleObservers(syncServer: SyncServer) {
+    /// may drop its Bonjour service across sleep). Only fires effect when the
+    /// server is running; a no-op while off. The quit-time stop lives in
+    /// `AppShutdown`, which runs before termination rather than in a blocking
+    /// `willTerminate` observer.
+    private static func installSyncServerWakeObserver(syncServer: SyncServer) {
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
             object: nil,
             queue: nil
         ) { _ in
             Task { await syncServer.reAdvertise() }
-        }
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.willTerminateNotification,
-            object: nil,
-            queue: nil
-        ) { _ in
-            let semaphore = DispatchSemaphore(value: 0)
-            Task.detached {
-                await syncServer.stop()
-                semaphore.signal()
-            }
-            _ = semaphore.wait(timeout: .now() + 1)
         }
     }
 }

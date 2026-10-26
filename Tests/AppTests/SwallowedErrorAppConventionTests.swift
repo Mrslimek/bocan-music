@@ -114,7 +114,7 @@ struct QuietRecoveryAppConventionTests {
             "FileManager.default.url(",
             "createDirectory",
             "removeItem",
-            "database.vacuum()",
+            "Task.sleep",
         ]
         let skippedFiles = ["DebugAudioView.swift"]
         let enumerator = try #require(

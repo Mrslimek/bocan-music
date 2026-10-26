@@ -36,9 +36,7 @@ Modules/UI/Sources/UI/Settings/SubsonicSettingsViewModel.swift|_ = try? await se
 Modules/UI/Sources/UI/ViewModels/NowPlayingViewModel.swift|if (try? FileManager.default.copyItem(at: sourceURL, to: tempURL)) != nil,  # cosmetic: the notification posts without artwork
 Modules/UI/Sources/UI/ViewModels/NowPlayingViewModel.swift|let attachment = try? UNNotificationAttachment(identifier: "artwork", url: tempURL) {  # cosmetic: the notification posts without artwork
 
-# App layer: a fallback path, the DEBUG-only transport window, and a quit-time
-# best effort that is already bounded by its own wait.
+# App layer: a fallback path and the DEBUG-only transport window.
 App/BocanApp.swift|let cachesRoot = (try? FileManager.default.url(  # caches directory lookup with a fallback path
 App/DebugAudioView.swift|Button("Play") { Task { try? await self.engine.play() } }  # debug or test tooling
 App/DebugAudioView.swift|Task { try? await self.engine.seek(to: self.positionSec) }  # debug or test tooling
-App/Lifecycle.swift|_ = try? await database.vacuum()  # documented best effort at quit, bounded by a 2 s wait
