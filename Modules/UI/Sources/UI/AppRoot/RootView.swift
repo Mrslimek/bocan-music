@@ -122,6 +122,13 @@ public struct BocanRootView: View {
                     )
                 }
 
+                // Shared-session surface (contract section 8): the compact
+                // remote line + conflict banner, composed directly above the
+                // play bar. Renders nothing while the source is local.
+                if let session = self.vm.nowPlaying.sessionViewModel {
+                    SessionSurfaceBanner(session: session)
+                }
+
                 NowPlayingStrip(vm: self.vm.nowPlaying, scrobbleSettingsVM: self.scrobbleSettingsVM)
                     .environmentObject(self.visualizerVM)
             }

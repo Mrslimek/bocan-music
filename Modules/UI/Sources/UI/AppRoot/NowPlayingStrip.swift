@@ -327,7 +327,7 @@ public struct NowPlayingStrip: View {
                 if !editing, let fraction = self.scrubDragFraction {
                     let target = fraction * self.vm.duration
                     self.scrubDragFraction = nil
-                    Task { await self.vm.scrub(to: target) }
+                    Task { await self.vm.sessionScrub(to: target) }
                 }
             }
             .controlSize(.mini)
@@ -342,7 +342,7 @@ public struct NowPlayingStrip: View {
                 guard direction == .increment || direction == .decrement else { return }
                 let step = max(self.vm.duration * 0.05, 5)
                 let pos = direction == .increment ? min(self.vm.position + step, self.vm.duration) : max(self.vm.position - step, 0)
-                Task { await self.vm.scrub(to: pos) }
+                Task { await self.vm.sessionScrub(to: pos) }
             }
             .accessibilityIdentifier(A11y.NowPlaying.scrubber)
             // CUE marker ticks (ADR-087): |------|-----|-|---- along the

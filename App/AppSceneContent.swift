@@ -32,7 +32,8 @@ struct SettingsWindowContent: View {
                 backupViewModel: graph.backupSettingsViewModel,
                 scrobbleViewModel: graph.scrobbleSettingsViewModel,
                 subsonicViewModel: graph.subsonicSettingsViewModel,
-                phoneSyncViewModel: graph.phoneSyncSettingsViewModel
+                phoneSyncViewModel: graph.phoneSyncSettingsViewModel,
+                presenceViewModel: graph.presenceViewModel
             )
             .environment(graph.dspViewModel)
             .environmentObject(graph.libraryViewModel)
@@ -44,6 +45,30 @@ struct SettingsWindowContent: View {
         }
     }
 }
+
+// MARK: - Presence peers
+
+struct PeersWindowContent: View {
+    let model: AppModel
+    var body: some View {
+        GraphContent(model: self.model) { graph in
+            PeersWindowView(viewModel: graph.peersViewModel)
+        }
+    }
+}
+
+// MARK: - Debug Presence (DEBUG only)
+
+#if DEBUG
+    struct DebugPresenceWindowContent: View {
+        let model: AppModel
+        var body: some View {
+            GraphContent(model: self.model) { _ in
+                DebugPresenceView()
+            }
+        }
+    }
+#endif
 
 // MARK: - Visualizer
 

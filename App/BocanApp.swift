@@ -6,6 +6,7 @@ import Observability
 import Persistence
 import Playback
 import Podcasts
+import Presence
 import Scrobble
 import Subsonic
 import SwiftUI
@@ -333,6 +334,17 @@ struct BocanApp: App {
         // launch). The other secondary windows already disable restoration.
         .restorationBehavior(.disabled)
 
+        // MARK: Presence peers
+
+        // Like Debug Audio below, deliberately NOT .commandsRemoved(): the
+        // auto-injected Window-menu item is this window's opener.
+        Window("Presence Peers", id: "presence-peers") {
+            PeersWindowContent(model: self.model)
+        }
+        .defaultSize(width: 720, height: 380)
+        .windowResizability(.contentMinSize)
+        .restorationBehavior(.disabled)
+
         // MARK: Log console
 
         Window("Log Console", id: "log-console") {
@@ -350,6 +362,14 @@ struct BocanApp: App {
             // window's only opener, and it never ships.
             Window("Debug Audio", id: "debug-audio") {
                 DebugAudioWindowContent(model: self.model)
+            }
+
+            // Live human-readable log of inter-device Presence traffic
+            // (directions, peer names, message types with key fields), over
+            // the .presence log category. Not .commandsRemoved(): the
+            // auto-injected Window-menu item is its only opener.
+            Window("Debug Presence", id: "debug-presence") {
+                DebugPresenceWindowContent(model: self.model)
             }
         #endif
     }
@@ -515,6 +535,8 @@ struct BocanApp: App {
             "general.showDockProgress": true,
             "console.captureEnabled": true,
             "sync.enabled": false,
+            "presence.enabled": false,
+            "presence.controlEnabled": true,
         ])
     }
 
@@ -632,6 +654,14 @@ struct AppGraph {
     let syncServer: SyncServer
     /// ADR-068: the Settings -> Phone Sync view model.
     let phoneSyncSettingsViewModel: PhoneSyncViewModel
+    /// The Presence peer-protocol engine (docs/design-spec/PROTOCOL.md).
+    let presence: PresenceEngine
+    /// The Settings -> Presence view model.
+    let presenceViewModel: PresenceViewModel
+    /// The Peers window view model.
+    let peersViewModel: PeersViewModel
+    /// The main window's shared-session store (contract section 8).
+    let sessionViewModel: SessionViewModel
     /// Backfills `tracks.content_hash` (the Phone Sync manifest `sha256`) in
     /// the background. Retained here because its observation holds it weakly.
     let contentHashService: ContentHashService
@@ -798,6 +828,149 @@ extension BocanApp {
         } catch {
             log.warning("subsonic.launch.pruneStaleCacheFailed", ["error": String(reflecting: error)])
         }
+    }
+
+    /// The "Play here" handoff (contract section 8 takeover flow): resolve
+    /// the peer's trackHash locally, start our copy at the peer's position.
+    /// Missing hash = library_unsynced, silent on the wire.
+    static func runHandoff(
+        peer: PeerSnapshot,
+        player: QueuePlayer,
+        index: TrackHashIndex
+    ) async -> PresenceHandoffOutcome {
+        let sessionLog = AppLogger.make(.presence)
+        guard let playback = peer.playback, let hash = playback.trackHash else {
+            return .libraryUnsynced
+        }
+        sessionLog.debug("presence.session.handoff_requested", [
+            "peer": peer.id,
+            "name": peer.name,
+            "hash": String(hash.prefix(12)),
+            "pos": String(format: "%.1f", playback.positionSec),
+        ])
+        guard let track = await index.track(forHash: hash) else {
+            sessionLog.debug("presence.session.handoff.unsynced", [
+                "peer": peer.id,
+                "hash": String(hash.prefix(12)),
+            ])
+            return .libraryUnsynced
+        }
+        do {
+            try await player.loadAndPlay(item: QueueItem.make(from: track), autoPlay: false)
+            try await player.seek(to: playback.positionSec)
+            try await player.play()
+            sessionLog.debug("presence.session.handoff_started", [
+                "peer": peer.id,
+                "track": track.title,
+                "pos": String(format: "%.1f", playback.positionSec),
+            ])
+            return .handedOff
+        } catch {
+            sessionLog.error("presence.session.handoff.failed", [
+                "peer": peer.id,
+                "error": String(reflecting: error),
+            ])
+            return .failed
+        }
+    }
+
+    /// Applies a remote-control command to the local player (contract section
+    /// 6). "stop" is pause + rewind to 0: QueuePlayer.stop() would eject the
+    /// current track and clear Up Next, which is not what a remote stop means.
+    static func applyPresenceCommand(
+        _ action: PresenceCommandAction,
+        position: Double?,
+        player: QueuePlayer,
+        log: AppLogger
+    ) async -> Bool {
+        do {
+            switch action {
+            case .play:
+                try await player.play()
+
+            case .pause:
+                await player.pause()
+
+            case .toggle:
+                try await player.togglePlayPause()
+
+            case .stop:
+                await player.pause()
+                try await player.seek(to: 0)
+
+            case .seek:
+                try await player.seek(to: position ?? 0)
+
+            case .next:
+                try await player.next()
+
+            case .previous:
+                try await player.previous()
+            }
+            return true
+        } catch is CancellationError {
+            return true
+        } catch {
+            log.error("presence.command.apply.failed", [
+                "action": action.rawValue,
+                "error": String(reflecting: error),
+            ])
+            return false
+        }
+    }
+
+    /// Local fallback for the main window's shared-session dispatch (contract
+    /// section 8): maps a Presence command onto the local player surface via
+    /// `NowPlayingViewModel`. "stop" is pause + rewind to 0 — the same rule
+    /// as `applyPresenceCommand`; `Player.stop()` is never used.
+    static func applyLocalSessionCommand(
+        _ action: PresenceCommandAction,
+        position: Double?,
+        player: NowPlayingViewModel
+    ) async {
+        switch action {
+        // play/pause share one check: toggle only when the local state
+        // differs from the requested one.
+        case .play, .pause:
+            let wantPlaying = action == .play
+            if await player.isPlaying != wantPlaying {
+                await player.playPause()
+            }
+
+        case .toggle:
+            await player.playPause()
+
+        case .stop:
+            if await player.isPlaying {
+                await player.playPause()
+            }
+            await player.scrub(to: 0)
+
+        case .seek:
+            await player.scrub(to: position ?? 0)
+
+        case .next:
+            await player.next()
+
+        case .previous:
+            await player.previous()
+        }
+    }
+
+    /// Bridges the engine's actor-isolated `sessionUpdates()` stream onto a
+    /// plain `AsyncStream` the synchronous `buildGraph` can hand to
+    /// `SessionViewModel`. Terminates when the engine is let go.
+    private static func bridgeSessionUpdates(from presence: PresenceEngine) -> AsyncStream<SessionView> {
+        let (stream, bridge) = AsyncStream<SessionView>.makeStream()
+        Task { [weak presence] in
+            guard let presence else { return }
+            let updates = await presence.sessionUpdates()
+            for await view in updates {
+                bridge.yield(view)
+            }
+            bridge.finish()
+        }
+        return stream
     }
 
     /// Builds and wires the full object graph once the database is open. Runs on
@@ -1072,8 +1245,90 @@ extension BocanApp {
         // the `library.watchForChanges` preference).
         Task { [weak lvm] in await lvm?.startOrStopWatcher() }
 
-        // Persist playback position on quit so it can be restored on next launch.
-        registerTerminationObserver(player: qp, database: db)
+        // The Presence peer-protocol engine (docs/design-spec/PROTOCOL.md).
+        // Constructed unconditionally so the Settings toggle can start/stop it,
+        // but only started here when `presence.enabled` is on (default off).
+        // `deviceName` is injected as a closure so Presence never imports
+        // AppKit. The engine taps the QueuePlayer through the playback fan-out.
+        // Remote-control gate (contract section 6): read live so the
+        // Settings toggle takes effect on the next inbound command. The
+        // executor maps protocol actions onto QueuePlayer; "stop" is pause +
+        // rewind to 0 because QueuePlayer.stop() would eject the current
+        // track and clear Up Next, which is not what a remote stop means.
+        let presenceControlEnabled: @Sendable () -> Bool = {
+            UserDefaults.standard.bool(forKey: "presence.controlEnabled")
+        }
+        // Shared session (contract section 8): track identity = tracks.content_hash
+        // (the persisted SHA-256 of the file bytes; the scanner's re-import is the
+        // staleness signal, the background backfill the incremental builder).
+        let trackHashIndex = TrackHashIndex(
+            tracks: TrackRepository(database: db),
+            contentHash: contentHashService
+        )
+        let presenceCommandExecutor: @Sendable (PresenceCommandAction, Double?) async -> Bool = { [qp] action, position in
+            await Self.applyPresenceCommand(action, position: position, player: qp, log: log)
+        }
+        let presence = PresenceEngine(
+            player: qp,
+            identity: PresenceIdentity.persisted(),
+            appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0",
+            controlEnabled: presenceControlEnabled,
+            commandExecutor: presenceCommandExecutor,
+            trackHashProvider: { trackID in
+                await trackHashIndex.hash(trackID: trackID)
+            },
+            onPeerBecameActive: { [qp] peerID, peerName, _, _, _ in
+                // Pause-on-peer-active policy (contract section 8's
+                // recommended default): the peer just started a fresh stint,
+                // so our own playing session yields.
+                if await qp.isPlaying {
+                    AppLogger.make(.presence).debug("presence.session.auto_paused", [
+                        "peer": peerID,
+                        "name": peerName,
+                    ])
+                    await qp.pause()
+                }
+            }
+        )
+        let presenceViewModel = PresenceViewModel(engine: presence)
+        let playHere: @Sendable (PeerSnapshot) async -> PresenceHandoffOutcome = { [qp, trackHashIndex] peer in
+            await Self.runHandoff(peer: peer, player: qp, index: trackHashIndex)
+        }
+        let peersViewModel = PeersViewModel(engine: presence, playHere: playHere)
+        // The main window's shared-session surface (contract section 8): the
+        // engine's session stream, the engine's outbound command path, and
+        // the SAME handoff closure the Peers window uses. buildGraph is
+        // synchronous and PresenceEngine is an actor, so the stream rides a
+        // relay task (bridgeSessionUpdates). The local fallback dispatches
+        // onto the local player surface; "stop" stays pause + rewind (never
+        // Player.stop()).
+        let sessionViewModel = SessionViewModel(
+            updates: Self.bridgeSessionUpdates(from: presence),
+            sendCommand: { [presence] peerID, action, position in
+                await presence.sendCommand(peerID: peerID, action: action, positionSec: position)
+            },
+            playHere: playHere
+        )
+        let nowPlayingViewModel = lvm.nowPlaying
+        sessionViewModel.setLocalDispatch { [weak nowPlayingViewModel] action, position in
+            guard let nowPlayingViewModel else { return }
+            await Self.applyLocalSessionCommand(action, position: position, player: nowPlayingViewModel)
+        }
+        nowPlayingViewModel.sessionViewModel = sessionViewModel
+        Self.installPresenceWakeObserver(presence: presence)
+        if UserDefaults.standard.bool(forKey: "presence.enabled") {
+            Task { [presence] in
+                do {
+                    try await presence.start()
+                } catch {
+                    log.error("presence.start.failed", ["error": String(reflecting: error)])
+                }
+            }
+        }
+
+        // Persist playback position on quit so it can be restored on next
+        // launch, and send Presence's goodbye.
+        registerTerminationObserver(player: qp, database: db, presence: presence)
 
         // ADR-067: the Phone Sync server. Constructed unconditionally so the
         // Settings toggle (22-8) can start/stop it, but only started here when
@@ -1101,6 +1356,7 @@ extension BocanApp {
         let phoneSyncViewModel = PhoneSyncViewModel(control: phoneSyncController)
         phoneSyncBridge.receiver = phoneSyncViewModel
         Self.installSyncServerLifecycleObservers(syncServer: syncServer)
+
         if UserDefaults.standard.bool(forKey: "sync.enabled") {
             Task { [syncServer] in
                 do {
@@ -1151,6 +1407,10 @@ extension BocanApp {
             logConsoleViewModel: LogConsoleViewModel(),
             syncServer: syncServer,
             phoneSyncSettingsViewModel: phoneSyncViewModel,
+            presence: presence,
+            presenceViewModel: presenceViewModel,
+            peersViewModel: peersViewModel,
+            sessionViewModel: sessionViewModel,
             contentHashService: contentHashService,
             artistEnrichmentService: artistEnrichment,
             deepDiveEnrichmentGate: deepDiveEnrichmentGate,
@@ -1182,6 +1442,18 @@ extension BocanApp {
                 semaphore.signal()
             }
             _ = semaphore.wait(timeout: .now() + 1)
+        }
+    }
+
+    /// Re-registers Presence's Bonjour service and re-browses after the system
+    /// wakes, when either may have been dropped. No-op while Presence is off.
+    private static func installPresenceWakeObserver(presence: PresenceEngine) {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: nil
+        ) { _ in
+            Task { await presence.reAdvertise() }
         }
     }
 }

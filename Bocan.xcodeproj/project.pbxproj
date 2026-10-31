@@ -14,6 +14,7 @@
 		0825DB354812A90F349CA0F5 /* SearchViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 186F049CE6669E44D287954A /* SearchViewModelTests.swift */; };
 		0930C3F6FA5F345B5A26F234 /* Library in Frameworks */ = {isa = PBXBuildFile; productRef = D12DF4C04E3DB095C79E72AA /* Library */; };
 		097BB13F4BF81674CA466906 /* DeepDiveEnrichmentGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2024ED1EAB843BDC967DDAED /* DeepDiveEnrichmentGateTests.swift */; };
+		09829CE32F89C641C9C956CB /* UI in Frameworks */ = {isa = PBXBuildFile; productRef = D1ABAB928B628AE14B24A3B8 /* UI */; };
 		09B12F83B7BD848E5E82B710 /* PhoneSyncController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99FF1E7A12FB10D997435BD5 /* PhoneSyncController.swift */; };
 		09EB5116A16C3BF5BE7F96F8 /* PhoneSyncWiringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7BCD10FC9FB02BCADD58FCB /* PhoneSyncWiringTests.swift */; };
 		0A5E6E49C73F82EF51F155C8 /* L10nTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3FA0EB21BFC45A22F1C61E1 /* L10nTests.swift */; };
@@ -155,7 +156,7 @@
 		8FBEF85C870FFF27D18A910F /* PodcastsSidebarConventionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58885B33390C32555279B1C6 /* PodcastsSidebarConventionTests.swift */; };
 		905B83A145C60C115F496A91 /* Persistence in Frameworks */ = {isa = PBXBuildFile; productRef = EFCF37422883F3C0CF718D56 /* Persistence */; };
 		93DB6B254FF06C7892311EAA /* GenresComposersScrollRestoreConventionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FC962EFCBEFE31DCE391766 /* GenresComposersScrollRestoreConventionTests.swift */; };
-		94BE1DE6EE31C9D7E5BEAB2F /* UI in Frameworks */ = {isa = PBXBuildFile; productRef = D1ABAB928B628AE14B24A3B8 /* UI */; };
+		94BE1DE6EE31C9D7E5BEAB2F /* Presence in Frameworks */ = {isa = PBXBuildFile; productRef = 261BFBDBFB07FBE5325E2B1F /* Presence */; };
 		96A36682C5C69445F0658AA8 /* RecentScrobblesConventionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C24DAA87753A2DF30A24F5C3 /* RecentScrobblesConventionTests.swift */; };
 		96B48CEB96CC567F7F79C574 /* LyricsViewModelOffsetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 098BB3C6E120AF87752F2F89 /* LyricsViewModelOffsetTests.swift */; };
 		976D432E1A15D52BEBF45D32 /* MenuCrawler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895EDA1D2F5C04C7F4A666BB /* MenuCrawler.swift */; };
@@ -552,10 +553,11 @@
 		F92A54888932177D777FBB3C /* LogConsoleViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogConsoleViewModelTests.swift; sourceTree = "<group>"; };
 		F94B4179774625EB29F24FA2 /* DSPCrossfadeForwardingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSPCrossfadeForwardingTests.swift; sourceTree = "<group>"; };
 		F9FA03B30FC5E8E7FB6D2DE8 /* LogStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogStoreTests.swift; sourceTree = "<group>"; };
+		FB41BD5AAE0DBC6C9C193DB4 /* Presence */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Presence; path = Modules/Presence; sourceTree = SOURCE_ROOT; };
 		FD18A2E69E819F5845E511F3 /* UpdateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateController.swift; sourceTree = "<group>"; };
 		FE67437858D66E54A636A323 /* PhoneSyncViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneSyncViewModelTests.swift; sourceTree = "<group>"; };
 		FEA827D3E6864D7D11A6F8BE /* BocanCommands+CollectionViewMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BocanCommands+CollectionViewMenu.swift"; sourceTree = "<group>"; };
-		"TEMP_A546A820-FF1B-4418-8FB7-7289054A6FB6" /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+		"TEMP_6FF24D6A-CF8A-4E33-B9F4-134A995F45EA" /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -574,7 +576,8 @@
 				9B60DEC59F8E4D4A133B1CAF /* Scrobble in Frameworks */,
 				7F67B098FEA98614EA0DEBD4 /* Subsonic in Frameworks */,
 				D4370EDB9ACA992B6E0B2E7B /* SyncServer in Frameworks */,
-				94BE1DE6EE31C9D7E5BEAB2F /* UI in Frameworks */,
+				94BE1DE6EE31C9D7E5BEAB2F /* Presence in Frameworks */,
+				09829CE32F89C641C9C956CB /* UI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -873,6 +876,7 @@
 				6E014B4987A60B08F6DE299A /* Persistence */,
 				8312FA03D246CA845C348E77 /* Playback */,
 				53E595DDA2F51C36CA1A31AE /* Podcasts */,
+				FB41BD5AAE0DBC6C9C193DB4 /* Presence */,
 				EA774AB72CC95F420281D172 /* Scrobble */,
 				531C8B2E4746B8942918520D /* Subsonic */,
 				A53BD4E14EFFC852676A7BC3 /* SyncServer */,
@@ -1077,10 +1081,10 @@
 			path = AppTests;
 			sourceTree = "<group>";
 		};
-		"TEMP_ACBCAAC6-3479-4C81-AFD7-94E9E2535C6E" /* bocan-music */ = {
+		"TEMP_F523F873-1C52-4B4B-BCD6-92A0A2650DD1" /* bocan-music */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_A546A820-FF1B-4418-8FB7-7289054A6FB6" /* Secrets.xcconfig */,
+				"TEMP_6FF24D6A-CF8A-4E33-B9F4-134A995F45EA" /* Secrets.xcconfig */,
 			);
 			path = "bocan-music";
 			sourceTree = "<group>";
@@ -1113,6 +1117,7 @@
 				7958F5C62AD395861A62A40B /* Scrobble */,
 				A785EA980EBAF6FB63114FE6 /* Subsonic */,
 				58C9E8133CBEE4B811E9598B /* SyncServer */,
+				261BFBDBFB07FBE5325E2B1F /* Presence */,
 				D1ABAB928B628AE14B24A3B8 /* UI */,
 			);
 			productName = Bocan;
@@ -1192,6 +1197,7 @@
 				73929B74C971FA1861E7E569 /* XCLocalSwiftPackageReference "Modules/Persistence" */,
 				166FA01824FE15FCD4D4D28B /* XCLocalSwiftPackageReference "Modules/Playback" */,
 				E9A576D858110977195D7E3F /* XCLocalSwiftPackageReference "Modules/Podcasts" */,
+				D1559C0929A24A52B71AE3A6 /* XCLocalSwiftPackageReference "Modules/Presence" */,
 				3B5F2EF875A6F6FFF55F7ACB /* XCLocalSwiftPackageReference "Modules/Scrobble" */,
 				83DC56AE955B2425894EBA99 /* XCLocalSwiftPackageReference "Modules/Subsonic" */,
 				8B93AF4010DB834422D8458F /* XCLocalSwiftPackageReference "Modules/SyncServer" */,
@@ -1536,7 +1542,7 @@
 		};
 		3E79DA1DC07FE3812FB54C0A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_A546A820-FF1B-4418-8FB7-7289054A6FB6" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_6FF24D6A-CF8A-4E33-B9F4-134A995F45EA" /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = arm64;
@@ -1673,7 +1679,7 @@
 		};
 		D3B7E2D650BF9AC5F77082BA /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_A546A820-FF1B-4418-8FB7-7289054A6FB6" /* Secrets.xcconfig */;
+			baseConfigurationReference = "TEMP_6FF24D6A-CF8A-4E33-B9F4-134A995F45EA" /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = arm64;
@@ -1751,7 +1757,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = 4P7SKNWGR6;
+				DEVELOPMENT_TEAM = 4374U77AHW;
 				INFOPLIST_FILE = Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Bòcan";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
@@ -1839,6 +1845,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Modules/AudioEngine;
 		};
+		D1559C0929A24A52B71AE3A6 /* XCLocalSwiftPackageReference "Modules/Presence" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Modules/Presence;
+		};
 		DC0F5EA22CB5FAA327417C6B /* XCLocalSwiftPackageReference "Modules/Observability" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Modules/Observability;
@@ -1868,6 +1878,10 @@
 		1F1B618974109388715D6BE6 /* Podcasts */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Podcasts;
+		};
+		261BFBDBFB07FBE5325E2B1F /* Presence */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Presence;
 		};
 		441F05155B692DC6D6F30264 /* AudioEngine */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -313,6 +313,12 @@ public actor QueuePlayer: Transport {
         await self.nowPlayingCentre?.setPlaying(true)
     }
 
+    /// Whether the last emitted playback state is `.playing` (the media-key
+    /// and remote-policy notion of "currently playing").
+    public var isPlaying: Bool {
+        self.lastEmittedState == .playing
+    }
+
     public func pause() async {
         // Persist a podcast position once before suspending, so a resume point
         // exists even between the 5 s ticks.
@@ -425,6 +431,12 @@ public actor QueuePlayer: Transport {
     public func unavailableItemIDs() -> Set<QueueItem.ID> {
         self._unavailableItemIDs
     }
+
+    // MARK: - Playback tap fan-out
+
+    /// Per-subscriber fan-out for non-UI observers; the methods live in
+    /// `QueuePlayer+PlaybackTap.swift`. See `PlaybackTapHub` for why.
+    var tapHub = PlaybackTapHub()
 
     /// Emits the set of queue-item IDs whose backing files are missing: the
     /// current set first, then again whenever availability is recomputed

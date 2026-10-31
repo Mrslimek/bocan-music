@@ -5,6 +5,7 @@ import Foundation
 import Observability
 import Persistence
 import Playback
+import Presence
 import Scrobble
 import Subsonic
 import UserNotifications
@@ -93,6 +94,13 @@ public final class NowPlayingViewModel {
     /// the engine exhausted its reconnect attempts. Set by `LibraryViewModel` to
     /// surface a toast. The transport has already stopped by the time this fires.
     public var onPlaybackError: (@MainActor () -> Void)?
+
+    /// The main window surface's shared-session store (contract section 8).
+    /// Wired once by the app graph after both surfaces exist; nil until
+    /// then. Only the `session*` transport wrappers read it — `playPause`,
+    /// `scrub`, `next` and `previous` stay purely local so the mini player,
+    /// menu bar and media keys never touch the session.
+    public var sessionViewModel: SessionViewModel?
 
     // MARK: - Internal
 
@@ -550,6 +558,51 @@ public extension NowPlayingViewModel {
         do { try await qp.next() } catch {
             self.log.error("transport.next.failed", ["error": String(reflecting: error)])
         }
+    }
+
+    // MARK: Session-aware transport (main window surface only, contract section 8)
+
+    /// While a connected peer holds the shared session the command goes to
+    /// it; otherwise these wrappers call the plain local methods below —
+    /// no duplicated side effects, no session branch inside them. The mini
+    /// player, menu bar and media keys keep calling the local methods
+    /// directly and are deliberately unaffected.
+    func sessionPlayPause() async {
+        if let session = sessionViewModel, session.isRemoteConnected {
+            await session.dispatch(.toggle)
+            return
+        }
+        await playPause()
+    }
+
+    /// Session-aware scrub: remote `seek` while a connected peer holds the
+    /// stint, local `scrub(to:)` otherwise.
+    func sessionScrub(to time: TimeInterval) async {
+        if let session = sessionViewModel, session.isRemoteConnected {
+            await session.dispatch(.seek, position: time)
+            return
+        }
+        await scrub(to: time)
+    }
+
+    /// Session-aware next: remote `next` while a connected peer holds the
+    /// stint, local `next()` otherwise.
+    func sessionNext() async {
+        if let session = sessionViewModel, session.isRemoteConnected {
+            await session.dispatch(.next)
+            return
+        }
+        await next()
+    }
+
+    /// Session-aware previous: remote `previous` while a connected peer holds
+    /// the stint, local `previous()` otherwise.
+    func sessionPrevious() async {
+        if let session = sessionViewModel, session.isRemoteConnected {
+            await session.dispatch(.previous)
+            return
+        }
+        await previous()
     }
 
     /// Toggles shuffle on the queue player.

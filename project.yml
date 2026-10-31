@@ -105,7 +105,7 @@ targets:
         # as errSecItemNotFound. Release signing is left to the notarization flow.
         Debug:
           CODE_SIGN_STYLE: Automatic
-          DEVELOPMENT_TEAM: 4P7SKNWGR6
+          DEVELOPMENT_TEAM: 4374U77AHW
     dependencies:
       - package: Sparkle
         product: Sparkle
@@ -119,6 +119,7 @@ targets:
       - package: Scrobble
       - package: Subsonic
       - package: SyncServer
+      - package: Presence
       - package: UI
     scheme:
       testTargets:
@@ -194,5 +195,7 @@ packages:
     path: Modules/Subsonic
   SyncServer:
     path: Modules/SyncServer
+  Presence:
+    path: Modules/Presence
   UI:
     path: Modules/UI

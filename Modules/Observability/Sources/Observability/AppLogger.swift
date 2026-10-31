@@ -28,8 +28,10 @@ public struct AppLogger: Sendable {
         self.store = .shared
     }
 
-    /// Internal initialiser used by tests to inject an isolated `LogStore`.
-    init(category: LogCategory, store: LogStore, subsystem: String = "io.cloudcauldron.bocan") {
+    /// Initialiser that injects an isolated `LogStore` instead of teeing into
+    /// `LogStore.shared`. Public so feature modules' test targets can assert
+    /// their protocol events against a store of their own.
+    public init(category: LogCategory, store: LogStore, subsystem: String = "io.cloudcauldron.bocan") {
         self.category = category
         self.logger = os.Logger(subsystem: subsystem, category: category.rawValue)
         self.store = store

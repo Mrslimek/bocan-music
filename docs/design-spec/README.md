@@ -104,6 +104,7 @@ Cross-cutting engineering rules live in [_standards.md](_standards.md) and bind 
 | [ADR-095-crossfade-overlap.md](ADR-095-crossfade-overlap.md) | Crossfade that overlaps: the pump mixes the outgoing and incoming tracks with equal-power curves on the one player node, an exact transition moment, and arming that works with the default settings (#567) |
 | [ADR-093-table-sort-chains.md](ADR-093-table-sort-chains.md) | Songs-table sort chains: stop truncating AppKit's descriptor list, cap at four and dedupe, one global tie-breaker chain with four per-column overrides, and the chain persisted across launches |
 | [ADR-096-lgpl-ffmpeg-build.md](ADR-096-lgpl-ffmpeg-build.md) | An LGPL FFmpeg build and a gate that proves it: every release so far bundled Homebrew's GPLv3 FFmpeg against the day-one rule; FFmpeg and fpcalc are now built from pinned source for every build (Debug, tests, CI and release), the release fails when a bundled library is not LGPL, and the notices are corrected (implemented 2026-10-02, not yet released) |
+| [ADR-097-presence.md](ADR-097-presence.md) | The Presence peer protocol: every running Bòcan advertises itself on the local network, discovers other Bòcan peers, connects over a WebSocket with keepalive and reconnect, and shares what each side is playing per the frozen contract in PROTOCOL.md |
 
 ## Conventions used in every ADR
 

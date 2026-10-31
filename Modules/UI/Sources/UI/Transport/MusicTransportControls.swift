@@ -73,7 +73,7 @@ struct MusicTransportControls: View {
                 if self.isRadio {
                     Task { await self.library.playPreviousStation() }
                 } else {
-                    Task { await self.vm.previous() }
+                    Task { await self.vm.sessionPrevious() }
                 }
             } label: {
                 Image(systemName: "backward.fill")
@@ -90,7 +90,7 @@ struct MusicTransportControls: View {
             .accessibilityIdentifier(A11y.NowPlaying.prev)
 
             Button {
-                Task { await self.vm.playPause() }
+                Task { await self.vm.sessionPlayPause() }
             } label: {
                 Image(systemName: self.vm.isPlaying ? "pause.fill" : "play.fill")
                     .scaledSystemFont(size: 24, weight: .bold)
@@ -107,7 +107,7 @@ struct MusicTransportControls: View {
                 if self.isRadio {
                     Task { await self.library.playNextStation() }
                 } else {
-                    Task { await self.vm.next() }
+                    Task { await self.vm.sessionNext() }
                 }
             } label: {
                 Image(systemName: "forward.fill")

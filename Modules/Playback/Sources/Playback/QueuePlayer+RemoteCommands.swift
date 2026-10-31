@@ -38,6 +38,13 @@ extension QueuePlayer {
         }
     }
 
+    /// Plays when paused, pauses when playing. Public wrapper over the media
+    /// key path so remote-control surfaces outside the module (Presence
+    /// commands) share the toggle semantics exactly.
+    public func togglePlayPause() async throws {
+        try await self.performTogglePlayPause()
+    }
+
     /// Runs a remote transport command, reporting a failure the way the in-app
     /// buttons do.
     ///
@@ -72,7 +79,7 @@ extension QueuePlayer {
                 "command": command.label,
                 "error": String(reflecting: error),
             ])
-            self.stateContinuation?.yield(.failed(Self.remoteFailure(error)))
+            await self.emitPlaybackState(.failed(Self.remoteFailure(error)))
         }
     }
 

@@ -1,0 +1,158 @@
+import Foundation
+
+// MARK: - Value types
+
+/// Playback status on the wire (contract section 6: playing | paused | stopped).
+public enum PresenceStatus: String, Sendable, Equatable, CaseIterable {
+    case playing
+    case paused
+    case stopped
+}
+
+/// The flattened payload of a `state_update`: what a peer is playing right now.
+/// `artist` is a Bòcan extension field; receivers must ignore unknown fields,
+/// and peers that do not send one leave it nil.
+public struct PresencePlaybackState: Sendable, Equatable {
+    public var track: String
+    public var artist: String?
+    public var status: PresenceStatus
+    public var positionSec: Double
+    /// Per-device monotonic counter, starts at 1 each app run, +1 per state change.
+    public var seq: Int
+    /// Shared session (contract section 8): lowercase-hex SHA-256 of the
+    /// audio file's bytes. Absent = the peer does not participate in the
+    /// session extension.
+    public var trackHash: String?
+    /// UUID v4 of one continuous playback stint: fresh on every track start
+    /// and every takeover; a pause-to-resume of the same stint keeps it.
+    public var playbackId: String?
+
+    public init(
+        track: String,
+        status: PresenceStatus,
+        positionSec: Double,
+        seq: Int,
+        artist: String? = nil,
+        trackHash: String? = nil,
+        playbackId: String? = nil
+    ) {
+        self.track = track
+        self.artist = artist
+        self.status = status
+        self.positionSec = positionSec
+        self.seq = seq
+        self.trackHash = trackHash
+        self.playbackId = playbackId
+    }
+
+    public static let empty = Self(track: "", status: .stopped, positionSec: 0, seq: 0)
+}
+
+/// A remote playback control action (contract section 6, `command`).
+public enum PresenceCommandAction: String, Sendable, Equatable, CaseIterable {
+    case play
+    case pause
+    case toggle
+    case stop
+    case seek
+    case next
+    case previous
+}
+
+/// A decoded `command` message. `action` keeps the wire string so foreign
+/// peers sending unknown actions surface as `command_ignored
+/// reason=unsupported` instead of malformed frames; `positionSec` is required
+/// by the contract for `seek` (enforced by the engine) and ignored otherwise.
+public struct PresenceCommand: Sendable, Equatable {
+    public let action: String
+    public let positionSec: Double?
+
+    public init(action: String, positionSec: Double? = nil) {
+        self.action = action
+        self.positionSec = positionSec
+    }
+}
+
+/// The identity fields carried by `hello` / `hello_ack` (contract section 6).
+public struct PresenceHelloInfo: Sendable, Equatable {
+    public var name: String
+    public var platform: String
+    public var appVersion: String
+
+    public init(name: String, platform: String, appVersion: String) {
+        self.name = name
+        self.platform = platform
+        self.appVersion = appVersion
+    }
+}
+
+/// One protocol message, decoded out of the envelope. `ping`/`pong` carry the
+/// envelope only; `pong` adds `replyTo`.
+public enum PresenceMessage: Sendable, Equatable {
+    case hello(PresenceHelloInfo)
+    case helloAck(PresenceHelloInfo)
+    case ping
+    case pong
+    case stateUpdate(PresencePlaybackState)
+    case test(text: String)
+    case command(PresenceCommand)
+    case goodbye(reason: String)
+
+    public var type: String {
+        switch self {
+        case .hello:
+            "hello"
+
+        case .helloAck:
+            "hello_ack"
+
+        case .ping:
+            "ping"
+
+        case .pong:
+            "pong"
+
+        case .stateUpdate:
+            "state_update"
+
+        case .test:
+            "test"
+
+        case .command:
+            "command"
+
+        case .goodbye:
+            "goodbye"
+        }
+    }
+}
+
+/// The common envelope fields (contract section 6).
+public struct PresenceEnvelope: Sendable, Equatable {
+    /// Protocol version; always 1.
+    public let version: Int
+    public let type: String
+    public let id: String
+    public let from: String
+    /// Sender clock, unix milliseconds. Informational only (contract section 4).
+    public let ts: Double
+    /// The id of the message this one answers, when applicable.
+    public let replyTo: String?
+
+    public init(version: Int, type: String, id: String, from: String, ts: Double, replyTo: String? = nil) {
+        self.version = version
+        self.type = type
+        self.id = id
+        self.from = from
+        self.ts = ts
+        self.replyTo = replyTo
+    }
+}
+
+/// The three receiver-rule outcomes (contract section 6): a known message, an
+/// unknown type (ignore, keep connected), or a malformed frame (ignore).
+public enum DecodedPresenceFrame: Sendable, Equatable {
+    case message(PresenceMessage, envelope: PresenceEnvelope)
+    case unknownType(PresenceEnvelope)
+    case malformed(reason: String, type: String?)
+}

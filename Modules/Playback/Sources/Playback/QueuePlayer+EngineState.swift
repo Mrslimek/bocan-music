@@ -16,19 +16,16 @@ extension QueuePlayer {
                 await self.handleTrackEnded()
 
             case .playing:
-                self.lastEmittedState = .playing
-                self.stateContinuation?.yield(.playing)
+                await self.emitPlaybackState(.playing)
                 await self.gaplessScheduler.start()
                 self.startScrobbleUpdateLoop()
 
             case .paused:
-                self.lastEmittedState = .paused
-                self.stateContinuation?.yield(.paused)
+                await self.emitPlaybackState(.paused)
                 self.stopScrobbleUpdateLoop()
 
             default:
-                self.lastEmittedState = engineState
-                self.stateContinuation?.yield(engineState)
+                await self.emitPlaybackState(engineState)
             }
         }
     }
@@ -143,21 +140,21 @@ extension QueuePlayer {
         // Stop-after-current wins over repeat modes. Reset the flag then stop.
         if await self.queue.stopAfterCurrent {
             await self.queue.setStopAfterCurrent(false)
-            self.stateContinuation?.yield(.ended)
+            await self.emitPlaybackState(.ended)
             await self.nowPlayingCentre?.setPlaying(false)
             await self.nowPlayingCentre?.clear()
             return
         }
 
         guard let next = await queue.advance() else {
-            self.stateContinuation?.yield(.ended)
+            await self.emitPlaybackState(.ended)
             await self.nowPlayingCentre?.setPlaying(false)
             await self.nowPlayingCentre?.clear()
             return
         }
 
         // Normal (non-gapless) load for next item.
-        self.stateContinuation?.yield(.loading)
+        await self.emitPlaybackState(.loading)
         do {
             try await self.loadAndPlay(item: next)
         } catch {
@@ -195,7 +192,7 @@ extension QueuePlayer {
         for skipped in 1 ... maxSkips {
             guard Self.isMissingFileError(loadError) else {
                 self.log.error("queueplayer.advance.failed", ["error": String(reflecting: loadError)])
-                self.stateContinuation?.yield(.failed(
+                await self.emitPlaybackState(.failed(
                     AudioEngineError.decoderFailure(codec: "unknown", underlying: loadError)
                 ))
                 return
@@ -226,7 +223,7 @@ extension QueuePlayer {
             await self.queue.remove(ids: [item.id])
 
             guard let next else {
-                self.stateContinuation?.yield(.ended)
+                await self.emitPlaybackState(.ended)
                 await self.nowPlayingCentre?.setPlaying(false)
                 await self.nowPlayingCentre?.clear()
                 return
@@ -235,7 +232,7 @@ extension QueuePlayer {
             // Mirror what next() does before loadAndPlay to keep gapless state clean.
             await self.gaplessScheduler.reset()
 
-            self.stateContinuation?.yield(.loading)
+            await self.emitPlaybackState(.loading)
             do {
                 try await self.loadAndPlay(item: next)
                 return
@@ -247,7 +244,7 @@ extension QueuePlayer {
 
         // Safety cap reached.
         self.log.error("queueplayer.skip.exhausted", ["skipped": maxSkips])
-        self.stateContinuation?.yield(.failed(
+        await self.emitPlaybackState(.failed(
             AudioEngineError.decoderFailure(codec: "unknown", underlying: loadError)
         ))
     }

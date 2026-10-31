@@ -17,7 +17,7 @@ All everyday commands go through the top-level `Makefile`. Run `make help` for t
 | Debug build | `make build` |
 | Unit + integration tests (Xcode bundle, excludes UI snapshots) | `make test` |
 | Coverage gate (CI gate, fails < 80%) | `make test-coverage` |
-| Per-module SPM tests | `make test-<module>` (one per module: `test-observability`, `test-persistence`, `test-metadata`, `test-library`, `test-acoustics`, `test-audio-engine`, `test-playback`, `test-scrobble`, `test-subsonic`, `test-podcasts`, `test-sync-server`, `test-ui`) |
+| Per-module SPM tests | `make test-<module>` (one per module: `test-observability`, `test-persistence`, `test-metadata`, `test-library`, `test-acoustics`, `test-audio-engine`, `test-playback`, `test-scrobble`, `test-subsonic`, `test-podcasts`, `test-sync-server`, `test-presence`, `test-ui`) |
 | Per-module coverage with module-level floors | `make coverage-all` |
 | Lint (strict, CI gate) | `make lint` |
 | Auto-format | `make format` |
@@ -37,7 +37,7 @@ Before opening a feat, fix or perf PR, run /slice-review. Its output is the `## 
 Strict module DAG, no upward imports:
 
 ```
-Observability → { AudioEngine, Metadata, Acoustics, Persistence } → { Subsonic, Podcasts, Library, Playback } → { Scrobble, SyncServer } → UI → App
+Observability → { AudioEngine, Metadata, Acoustics, Persistence } → { Subsonic, Podcasts, Library, Playback } → { Scrobble, SyncServer, Presence } → UI → App
 ```
 
 Inside a layer the modules are not all independent. `Library` depends on `Metadata` and `Acoustics`, `Playback` on `AudioEngine`, `Scrobble` on `Playback`, and `SyncServer` on `AudioEngine`, `Library`, `Metadata` and `Podcasts`. The table in `docs/design-spec/_standards.md` ("Module layout") is the source of truth for every edge.
@@ -54,6 +54,7 @@ Inside a layer the modules are not all independent. `Library` depends on `Metada
 | `Subsonic` | `SubsonicService` actor wrapping the `SwiftSonic` client; capability detection (advertised + legacy-core probe); Keychain credentials. |
 | `Acoustics` | Chromaprint fingerprinting + AcoustID, the single `MusicBrainzClient` (recording, artist, release-group; one shared 1 req/s limiter for the whole app) and `WikipediaClient`. |
 | `Podcasts` | FeedKit-based RSS/Atom feed refresh, Podcast Index + iTunes search, subscriptions, episode downloads and retention, Podcasting 2.0 extras (chapters, transcripts, persons, podroll). |
+| `Presence` | The peer-protocol engine (docs/design-spec/PROTOCOL.md, ADR-097): mDNS advertiser + browser for `_musicshare._tcp`, the WebSocket listener and client dials, one connection actor per peer (handshake, keepalive, tie-break, newest-wins, reconnect ladder), the playback state tap over `QueuePlayer.playbackTapUpdates()`, and the peer directory stream. Started from App when `presence.enabled` is on. |
 | `SyncServer` | Phone Sync (ADR-060 to ADR-070): `ServerIdentity` (self-signed P-256 login-Keychain TLS identity), `TrustedDevices` trust store, and the Bonjour-advertised mutual-TLS server (`SyncListener`, `SyncServer`) that serves a manifest + files read-only to a paired phone. Separate identity/port from any ADR-034 remote control. |
 | `UI` | All SwiftUI views, view models (`LibraryViewModel` is the spine), settings, mini player, snapshot tests. Only module that imports AppKit (one allowlisted exception: `NowPlayingCentre` in `Playback`, for `MPMediaItemArtwork`); `Scripts/audit-appkit-imports.py` enforces it from `make lint`. A lower module that wants an AppKit event exposes a method and `App` subscribes. |
 

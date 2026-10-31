@@ -19,19 +19,22 @@ public struct SettingsScene: View {
     private let backupViewModel: BackupSettingsViewModel
     private let subsonicViewModel: SubsonicSettingsViewModel?
     private let phoneSyncViewModel: PhoneSyncViewModel?
+    private let presenceViewModel: PresenceViewModel?
 
     public init(
         router: SettingsRouter,
         backupViewModel: BackupSettingsViewModel,
         scrobbleViewModel: ScrobbleSettingsViewModel? = nil,
         subsonicViewModel: SubsonicSettingsViewModel? = nil,
-        phoneSyncViewModel: PhoneSyncViewModel? = nil
+        phoneSyncViewModel: PhoneSyncViewModel? = nil,
+        presenceViewModel: PresenceViewModel? = nil
     ) {
         self.router = router
         self.scrobbleViewModel = scrobbleViewModel
         self.backupViewModel = backupViewModel
         self.subsonicViewModel = subsonicViewModel
         self.phoneSyncViewModel = phoneSyncViewModel
+        self.presenceViewModel = presenceViewModel
     }
 
     private var sections: [SettingsSection] {
@@ -140,6 +143,22 @@ public struct SettingsScene: View {
 
         case .phoneSync:
             self.phoneSyncDetail
+
+        case .presence:
+            self.presenceDetail
+        }
+    }
+
+    @ViewBuilder
+    private var presenceDetail: some View {
+        if let presenceViewModel = self.presenceViewModel {
+            PresenceSettingsView(viewModel: presenceViewModel)
+        } else {
+            ContentUnavailableView(
+                L10n.string("Presence Unavailable"),
+                systemImage: "person.2.slash",
+                description: Text(localized: "Presence can't be configured right now.")
+            )
         }
     }
 
@@ -180,7 +199,7 @@ struct SettingsSection: Identifiable {
         advanced.append(contentsOf: [.advanced, .diagnostics])
         return [
             Self(title: nil, pages: [.general, .appearance]),
-            Self(title: L10n.string("Library"), pages: [.library, .sources, .smartPlaylists, .podcasts, .phoneSync]),
+            Self(title: L10n.string("Library"), pages: [.library, .sources, .smartPlaylists, .podcasts, .phoneSync, .presence]),
             Self(title: L10n.string("Playback"), pages: [.playback, .equaliser, .effects, .replayGain]),
             Self(title: L10n.string("Now Playing"), pages: [.lyrics, .visualizer]),
             Self(title: L10n.string("Advanced"), pages: advanced),
@@ -240,6 +259,9 @@ extension SettingsPage {
 
         case .phoneSync:
             L10n.string("Phone Sync")
+
+        case .presence:
+            L10n.string("Presence")
         }
     }
 
@@ -292,6 +314,9 @@ extension SettingsPage {
 
         case .phoneSync:
             "iphone.and.arrow.forward"
+
+        case .presence:
+            "person.2.wave.2"
         }
     }
 }

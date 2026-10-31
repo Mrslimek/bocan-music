@@ -536,6 +536,16 @@ The same applies to cyclomatic complexity, which is capped at 10. The graph buil
 
 **Canonical file:** `.swiftlint.yml` and `Scripts/pre-commit`
 
+### NWListener and the NW WebSocket stack can be broken OS-wide; use the Presence transport fallback pattern
+
+**Problem:** `NWListener.start` fails with `POSIXErrorCode(rawValue: 22): Invalid argument` in every configuration (plain TCP, WS options, any port or fixed, sandboxed or not, bundled or bare CLI), and a `NWConnection` with `NWProtocolWebSocket` options to a local server never leaves the `waiting` state (POSIX 50, no bytes leave) - while POSIX BSD sockets, plain-TCP `NWConnection` clients, `dns-sd`, and Foundation `NetService`/`NetServiceBrowser` all work in the very same processes. Raw `bind()` succeeding makes it look like a code bug, and the mix of working and broken NW paths makes it look like a permission problem; both attributions are wrong.
+
+**Rule:** measured on this machine's macOS build (2026-10-31, ADR-097 amendment): do not build a transport on `NWListener` or `NWProtocolWebSocket` alone. Either layer the Presence fallback (`PresenceListener` + `BSDWSServer` + `BSDWSSocket` + `NetServicePresence`: NW primary with a 2 s startup probe, POSIX RFC 6455 sockets and NetService discovery behind it, selected by `PresenceConfig.transportStack`), or gate any NW-listening test behind a capability probe (`LoopbackIntegrationTests.listenerBindable`) that records a `withKnownIssue` instead of failing, with the protocol coverage carried over an in-memory or BSD path (`PairedTransport` pairs, `listenerLoopbackOverBSDSockets`).
+
+**Why:** the NW listen and WS-handshake paths consult a system layer that fails for whole processes while other NW paths (plain TCP clients) and everything outside Network.framework (POSIX sockets, dns_sd via NetService) stay healthy; the same binary reproduces the failure on every run, so it is deterministic per context but not explained by grants, entitlements, or code. The MVP reference peer has run for days on NetService + BSD sockets on exactly this machine.
+
+**Canonical file:** `Modules/Presence/Sources/Presence/Transport/PresenceListener.swift` (the fallback decision) and `docs/design-spec/ADR-097-presence.md` ("Amendment 2026-10-31")
+
 ### A file split can break a test or an audit that names the file
 
 **Problem:** a pure move of code into a `Type+Topic.swift` extension file makes `make lint` fail in the `try?` audit, or makes a convention test fail, although no behaviour changed.

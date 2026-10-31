@@ -13,7 +13,10 @@ extension QueuePlayer {
         try await self.loadAndPlay(item: item, autoPlay: false)
     }
 
-    func loadAndPlay(item: QueueItem, autoPlay: Bool = true) async throws {
+    /// Loads one item and starts it (optionally paused). Public for
+    /// remote-control surfaces: the shared-session handoff starts a specific
+    /// track at a peer's position (contract section 8).
+    public func loadAndPlay(item: QueueItem, autoPlay: Bool = true) async throws {
         // A manual load always starts fresh; the engine's load drops any
         // armed crossfade.
         self.armedBoundary = nil

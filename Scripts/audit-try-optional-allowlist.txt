@@ -42,3 +42,18 @@ App/BocanApp.swift|let cachesRoot = (try? FileManager.default.url(  # caches dir
 App/DebugAudioView.swift|Button("Play") { Task { try? await self.engine.play() } }  # debug or test tooling
 App/DebugAudioView.swift|Task { try? await self.engine.seek(to: self.positionSec) }  # debug or test tooling
 App/Lifecycle.swift|_ = try? await database.vacuum()  # documented best effort at quit, bounded by a 2 s wait
+
+# Presence wire encoding: every encode input is JSON-safe by construction
+# (strings, numbers, nil-able strings), so encode cannot throw at these sites;
+# a failure would mean the codec itself is broken, which tests pin.
+Modules/Presence/Sources/Presence/Connection/PeerConnection+Wire.swift|guard let text = try? WireCodec.encode(.ping, envelope: envelope) else { return }  # encode of a JSON-safe dictionary cannot throw; ping has no payload fields
+Modules/Presence/Sources/Presence/Connection/PeerConnection+Wire.swift|guard let text = try? WireCodec.encode(.pong, envelope: envelope) else { return }  # encode of a JSON-safe dictionary cannot throw; pong is envelope-only
+Modules/Presence/Sources/Presence/Connection/PeerConnection+Wire.swift|guard let text = try? WireCodec.encode(message, envelope: envelope) else { return }  # encode of a JSON-safe dictionary cannot throw; message payloads are strings/numbers
+Modules/Presence/Sources/Presence/Connection/PeerConnection.swift|guard let text = try? WireCodec.encode(.hello(info), envelope: envelope) else { return }  # encode of a JSON-safe dictionary cannot throw; hello fields are strings
+
+# Presence receive path: the parse IS the failure mode. decode's documented
+# contract is "never throws; every unparseable frame is a receiver rule", so
+# the try? is the implementation of that contract, not a swallowed error.
+Modules/Presence/Sources/Presence/Wire/WireCodec.swift|let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {  # contract: unparseable frames decode to .malformed and are ignored
+Modules/Library/Sources/Library/ContentHashService.swift|guard let track = try? await self.tracks.fetchIfPresent(id: trackID) else { return nil }  # conservative: an unreadable row or file means no hash; same fail-safe as the backfill path
+Modules/Library/Sources/Library/ContentHashService.swift|return (try? await self.tracks.fetchIfPresent(id: id))?.contentHash  # conservative: a failed re-read after hashing reports no hash; the next pass retries

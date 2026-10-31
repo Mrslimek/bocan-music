@@ -312,6 +312,13 @@ test-sync-server:
 	@echo "=============================="
 	cd Modules/SyncServer && swift test $(SWIFT_TEST_FLAGS) --enable-code-coverage
 
+## test-presence: Run Presence SPM package tests (wire codec, keepalive, tie-break, loopback)
+test-presence:
+	@echo "=============================="
+	@echo "= Executing Presence Test"
+	@echo "=============================="
+	cd Modules/Presence && swift test $(SWIFT_TEST_FLAGS) --enable-code-coverage
+
 ## test-observability: Run Observability SPM package tests
 test-observability:
 	@echo "=============================="

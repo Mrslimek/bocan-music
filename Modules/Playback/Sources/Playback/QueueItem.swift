@@ -201,7 +201,8 @@ public struct QueueItem: Sendable, Identifiable, Hashable, Codable {
 /// Factory that builds a queue item from a library `Track` row.
 public extension QueueItem {
     /// Build a `QueueItem` from a `Track` row.
-    static func make(from track: Track, artistName: String? = nil) -> QueueItem {
+    /// Builds a queue item from a library track (handoff, queue operations).
+    public static func make(from track: Track, artistName: String? = nil) -> QueueItem {
         let fmt = AudioSourceFormat(
             sampleRate: Double(track.sampleRate ?? 44100),
             bitDepth: track.bitDepth ?? 16,

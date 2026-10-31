@@ -130,6 +130,20 @@ public actor ContentHashService {
         ])
     }
 
+    /// The persisted SHA-256 for `trackID`, hashing the file lazily when no
+    /// digest is stored yet. This is the shared-session `trackHash` (contract
+    /// section 8): identical synced files share the digest, so it doubles as
+    /// cross-device track identity. Returns nil when the track has no
+    /// readable file.
+    public func hash(trackID: Int64) async -> String? {
+        guard let track = try? await self.tracks.fetchIfPresent(id: trackID) else { return nil }
+        if let existing = track.contentHash {
+            return existing
+        }
+        guard await self.hashOne(track, id: trackID), let id = track.id else { return nil }
+        return (try? await self.tracks.fetchIfPresent(id: id))?.contentHash
+    }
+
     /// Hashes a single track's file and stores the digest. Returns `false` on
     /// any failure (missing file, unreadable bookmark, write error); the
     /// cursor has already moved past the track, so a broken file costs one

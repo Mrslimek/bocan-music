@@ -210,6 +210,26 @@ public struct TrackRepository: Sendable {
         }
     }
 
+    /// The track whose persisted content hash equals `hash`, if any. The
+    /// shared-session resolver (contract section 8) turns a peer's
+    /// `trackHash` into the local copy of the same file.
+    public func fetchTrackID(contentHash: String) async throws -> Int64? {
+        try await self.database.read { db in
+            try Track.filter(Column("content_hash") == contentHash)
+                .filter(Column("disabled") == false)
+                .select(Column("id"))
+                .fetchOne(db)
+        }
+    }
+
+    /// The track row for `id`, or nil when absent (unlike `fetch(id:)`,
+    /// which throws).
+    public func fetchIfPresent(id: Int64) async throws -> Track? {
+        try await self.database.read { db in
+            try Track.filter(Column("id") == id).fetchOne(db)
+        }
+    }
+
     /// Observes the number of hashable tracks still missing a content hash.
     /// Emits the current value on subscribe and again whenever it changes, so a
     /// backfill service can both start work at launch and react to re-imports
