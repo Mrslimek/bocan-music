@@ -118,7 +118,9 @@ public actor PlaybackTap {
                 state: latest.state,
                 item: latest.currentItem,
                 position: position,
-                trackHash: self.lastTrackHash
+                trackHash: self.lastTrackHash,
+                shuffle: latest.shuffle,
+                repeatMode: latest.repeat
             )
         )
     }
@@ -127,7 +129,9 @@ public actor PlaybackTap {
         state: PlaybackState,
         item: QueueItem?,
         position: TimeInterval,
-        trackHash: String?
+        trackHash: String?,
+        shuffle: Bool? = nil,
+        repeatMode: RepeatMode? = nil
     ) -> PresencePlaybackState {
         let status: PresenceStatus = switch state {
         case .playing:
@@ -139,14 +143,17 @@ public actor PlaybackTap {
         default:
             .stopped
         }
-        // The engine assigns the seq and the playback stint id.
+        // The engine assigns the seq and the playback stint id. The queue
+        // modes are the playback-mode extension (contract section 6).
         return PresencePlaybackState(
             track: item?.title ?? "",
             status: status,
             positionSec: position,
             seq: 0,
             artist: item?.artistName,
-            trackHash: trackHash
+            trackHash: trackHash,
+            shuffle: shuffle,
+            repeat: repeatMode.flatMap { PresenceRepeatMode(rawValue: $0.rawValue) }
         )
     }
 }

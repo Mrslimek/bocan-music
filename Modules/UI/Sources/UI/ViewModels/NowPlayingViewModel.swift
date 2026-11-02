@@ -617,6 +617,14 @@ public extension NowPlayingViewModel {
         self.shuffleOn = on
     }
 
+    /// Sets an explicit repeat mode on the queue player (mirrors `setShuffle`,
+    /// so the shared-session local dispatch can apply remote mode commands).
+    func setRepeat(_ mode: RepeatMode) async {
+        guard let qp = engine as? QueuePlayer else { return }
+        await qp.setRepeat(mode)
+        self.repeatMode = mode
+    }
+
     /// Cycles to the next repeat mode (off → all → one → off).
     func cycleRepeat() async {
         guard let qp = engine as? QueuePlayer else { return }

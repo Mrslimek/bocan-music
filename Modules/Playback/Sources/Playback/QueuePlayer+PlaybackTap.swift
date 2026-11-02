@@ -47,7 +47,7 @@ extension QueuePlayer {
         let id = UUID()
         self.tapHub.add(id, continuation)
         let item = await self.queue.currentItem
-        continuation.yield(PlaybackTapSnapshot(state: self.lastEmittedState, currentItem: item))
+        continuation.yield(await self.currentSnapshot(state: self.lastEmittedState, item: item))
         continuation.onTermination = { [weak self] _ in
             guard let self else { return }
             Task { await self.tapHub.remove(id) }
@@ -65,6 +65,17 @@ extension QueuePlayer {
         self.stateContinuation?.yield(state)
         guard self.tapHub.subscriberCount > 0 else { return }
         let item = await self.queue.currentItem
-        self.tapHub.emit(PlaybackTapSnapshot(state: state, currentItem: item))
+        self.tapHub.emit(await self.currentSnapshot(state: state, item: item))
+    }
+
+    private func currentSnapshot(state: PlaybackState, item: QueueItem?) async -> PlaybackTapSnapshot {
+        let shuffleState = await self.queue.shuffleState
+        let repeatMode = await self.queue.repeatMode
+        return PlaybackTapSnapshot(
+            state: state,
+            currentItem: item,
+            shuffle: shuffleState != .off,
+            repeat: repeatMode
+        )
     }
 }

@@ -1,5 +1,3 @@
-> Copied from /Users/viktor/Projects/music_share_protocol/protocol/PROTOCOL.md - canonical source there; do not diverge.
-
 # Music Share MVP — Peer Test Protocol (v1)
 
 Shared contract for the macOS and Android apps. Both apps MUST implement this document
@@ -14,6 +12,11 @@ Changelog: 2026-10-31 (2) — added the optional **shared session** extension
 (see §8): `trackHash`/`playbackId` on `state_update`, the single-active-device
 invariant, `session_conflict` detection, and the recommended pause-on-peer-active
 policy. Players own policy; the protocol owns state and violation detection.
+Changelog: 2026-11-02 — **playback-mode extension**: five new optional `command`
+actions (`repeat_off` | `repeat_all` | `repeat_one` | `shuffle_on` | `shuffle_off`)
+and two optional `state_update` fields (`shuffle`: bool, `repeat`: `off`|`all`|`one`)
+so peers can control AND observe each other's queue modes. All optional under the
+tolerant-receiver rules; v1 peers interoperate unchanged.
 
 ## 1. Topology
 
@@ -127,6 +130,11 @@ Envelope only. `pong` carries `replyTo` = the answered `ping.id`.
   policy is applied — the newest arrival is displayed and the anomaly is recorded.
 - Optional session fields `trackHash` and `playbackId` (§8) ride on this message when
   the peer implements the shared-session extension.
+- Optional playback-mode fields (added 2026-11-02): `shuffle` (bool) and `repeat`
+  (`off` | `all` | `one`) — the sender's current queue modes. Send them when the
+  player has such modes; omit them otherwise. Receivers that implement the modes
+  store the latest values per peer so their UI can reflect the remote player
+  truthfully; all other receivers ignore them.
 
 ### test
 ```json
@@ -139,8 +147,12 @@ Remote playback control, fire-and-forget:
 {"v":1,"type":"command","id":"…","from":"…","ts":…,
  "action":"pause","positionSec":42.5}
 ```
-- `action` ∈ `play` | `pause` | `toggle` | `stop` | `seek` | `next` | `previous`.
+- `action` ∈ `play` | `pause` | `toggle` | `stop` | `seek` | `next` | `previous` |
+  `repeat_off` | `repeat_all` | `repeat_one` | `shuffle_on` | `shuffle_off`.
   `positionSec` (number, seconds) is REQUIRED for `seek` and otherwise ignored.
+  The `repeat_*` / `shuffle_*` actions (added 2026-11-02) set the target's queue
+  modes; their effect is observable through the target's `state_update`
+  `shuffle`/`repeat` fields.
 - No reply message. The effect is observable through the target's subsequent
   `state_update` broadcast (senders must not assume success from silence).
 - Receivers apply the command to their local player only if the local user has not

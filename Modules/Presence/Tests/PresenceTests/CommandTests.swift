@@ -172,6 +172,62 @@ struct CommandReceiverTests {
         #expect(malformed.first?.message.contains("positionSec") == true)
     }
 
+    @Test("playback-mode extension actions reach the executor with the mapped action", arguments: [
+        ("repeat_off", PresenceCommandAction.repeatOff),
+        ("repeat_all", PresenceCommandAction.repeatAll),
+        ("repeat_one", PresenceCommandAction.repeatOne),
+        ("shuffle_on", PresenceCommandAction.shuffleOn),
+        ("shuffle_off", PresenceCommandAction.shuffleOff),
+    ])
+    func playbackModeCommandReachesExecutor(wire: String, expected: PresenceCommandAction) async {
+        let store = LogStore(capacity: 500)
+        let executor = Mutex<PresenceCommandAction?>(nil)
+        let engine = Harness.makeEngine(
+            selfID: "mmm",
+            name: "Middle",
+            executor: { action, _ in
+                executor.withLock { $0 = action }
+                return true
+            },
+            store: store
+        )
+        await engine.seedPeerForTesting(peerID: "zzz", name: "Pixel 8")
+
+        await engine.applyInboundCommandForTesting(
+            PresenceCommand(action: wire, positionSec: nil),
+            owner: "zzz"
+        )
+        #expect(executor.withLock { $0 } == expected)
+        #expect(ignoredEntries(store).isEmpty)
+    }
+
+    @Test
+    func disabledGateIgnoresPlaybackModeCommands() async {
+        let store = LogStore(capacity: 500)
+        let calls = Mutex<Int>(0)
+        let engine = Harness.makeEngine(
+            selfID: "mmm",
+            name: "Middle",
+            controlEnabled: { false },
+            executor: { _, _ in
+                calls.withLock { $0 += 1 }
+                return true
+            },
+            store: store
+        )
+        await engine.seedPeerForTesting(peerID: "zzz", name: "Pixel 8")
+
+        await engine.applyInboundCommandForTesting(
+            PresenceCommand(action: "repeat_all", positionSec: nil),
+            owner: "zzz"
+        )
+        #expect(calls.withLock { $0 } == 0)
+        let ignored = ignoredEntries(store)
+        #expect(ignored.count == 1)
+        #expect(ignored.first?.message.contains("action=repeat_all") == true)
+        #expect(ignored.first?.message.contains("reason=disabled") == true)
+    }
+
     @Test
     func executorRefusalLogsUnsupported() async {
         let store = LogStore(capacity: 500)

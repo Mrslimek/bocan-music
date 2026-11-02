@@ -224,6 +224,7 @@ public extension QueuePlayer {
     /// Toggle shuffle on/off.
     func setShuffle(_ on: Bool, strategy: (any ShuffleStrategy)? = nil) async {
         await self.queue.setShuffle(on)
+        await self.emitModeChange()
     }
 
     /// Set the playback volume [0–1], forwarded to the audio engine.
@@ -239,6 +240,17 @@ public extension QueuePlayer {
     /// Change the repeat mode.
     func setRepeat(_ mode: RepeatMode) async {
         await self.queue.setRepeatMode(mode)
+        await self.emitModeChange()
+    }
+
+    /// Re-emits the current playback state with the current queue modes so
+    /// playback-tap subscribers observe shuffle/repeat changes. The
+    /// music-share extension's `setRepeatMode(_:)` is the existing
+    /// `setRepeat(_:)`: the app's repeat model already spans the protocol's
+    /// three values (off / all / one).
+    private func emitModeChange() async {
+        guard self.tapHub.subscriberCount > 0 else { return }
+        await self.emitPlaybackState(self.lastEmittedState)
     }
 
     /// Enable or disable stop-after-current.

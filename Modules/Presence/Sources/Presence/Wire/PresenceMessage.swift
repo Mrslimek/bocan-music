@@ -9,6 +9,14 @@ public enum PresenceStatus: String, Sendable, Equatable, CaseIterable {
     case stopped
 }
 
+/// The queue repeat mode on the wire (contract section 6, playback-mode
+/// extension added 2026-11-02).
+public enum PresenceRepeatMode: String, Sendable, Equatable, CaseIterable {
+    case off
+    case all
+    case one
+}
+
 /// The flattened payload of a `state_update`: what a peer is playing right now.
 /// `artist` is a Bòcan extension field; receivers must ignore unknown fields,
 /// and peers that do not send one leave it nil.
@@ -26,6 +34,10 @@ public struct PresencePlaybackState: Sendable, Equatable {
     /// UUID v4 of one continuous playback stint: fresh on every track start
     /// and every takeover; a pause-to-resume of the same stint keeps it.
     public var playbackId: String?
+    /// Playback-mode extension (contract section 6, added 2026-11-02): the
+    /// sender's queue modes. Absent = the peer does not report them.
+    public var shuffle: Bool?
+    public var `repeat`: PresenceRepeatMode?
 
     public init(
         track: String,
@@ -34,7 +46,9 @@ public struct PresencePlaybackState: Sendable, Equatable {
         seq: Int,
         artist: String? = nil,
         trackHash: String? = nil,
-        playbackId: String? = nil
+        playbackId: String? = nil,
+        shuffle: Bool? = nil,
+        repeat: PresenceRepeatMode? = nil
     ) {
         self.track = track
         self.artist = artist
@@ -43,6 +57,8 @@ public struct PresencePlaybackState: Sendable, Equatable {
         self.seq = seq
         self.trackHash = trackHash
         self.playbackId = playbackId
+        self.shuffle = shuffle
+        self.repeat = `repeat`
     }
 
     public static let empty = Self(track: "", status: .stopped, positionSec: 0, seq: 0)
@@ -57,6 +73,12 @@ public enum PresenceCommandAction: String, Sendable, Equatable, CaseIterable {
     case seek
     case next
     case previous
+    // Playback-mode extension (contract section 6, added 2026-11-02).
+    case repeatOff = "repeat_off"
+    case repeatAll = "repeat_all"
+    case repeatOne = "repeat_one"
+    case shuffleOn = "shuffle_on"
+    case shuffleOff = "shuffle_off"
 }
 
 /// A decoded `command` message. `action` keeps the wire string so foreign

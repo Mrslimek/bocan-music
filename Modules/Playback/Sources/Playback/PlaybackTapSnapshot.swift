@@ -12,9 +12,21 @@ import Foundation
 public struct PlaybackTapSnapshot: Sendable, Equatable {
     public let state: PlaybackState
     public let currentItem: QueueItem?
+    /// Current queue modes (music-share playback-mode extension): reported so
+    /// observers can reflect them truthfully. Defaults keep existing
+    /// call sites compiling.
+    public let shuffle: Bool
+    public let `repeat`: RepeatMode
 
-    public init(state: PlaybackState, currentItem: QueueItem?) {
+    public init(
+        state: PlaybackState,
+        currentItem: QueueItem?,
+        shuffle: Bool = false,
+        repeat: RepeatMode = .off
+    ) {
         self.state = state
         self.currentItem = currentItem
+        self.shuffle = shuffle
+        self.repeat = `repeat`
     }
 }

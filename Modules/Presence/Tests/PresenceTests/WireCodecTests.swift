@@ -60,6 +60,52 @@ struct WireCodecTests {
     }
 
     @Test
+    func stateUpdateRoundTripWithPlaybackModes() throws {
+        // Playback-mode extension (protocol 2026-11-02).
+        let state = PresencePlaybackState(
+            track: "Song", status: .playing, positionSec: 1, seq: 3, shuffle: true, repeat: .one
+        )
+        let text = try WireCodec.encode(.stateUpdate(state), from: "aaa", nowMs: 1)
+        guard case let .message(.stateUpdate(decoded), _) = WireCodec.decode(text) else {
+            Issue.record("expected state_update")
+            return
+        }
+        #expect(decoded == state)
+        #expect(text.contains("\"shuffle\":true"))
+        #expect(text.contains("\"repeat\":\"one\""))
+    }
+
+    @Test
+    func stateUpdateWithoutModesOmitsKeysAndDecodesNil() throws {
+        // Nil modes must not add new keys (byte-compatibility with old peers).
+        let state = PresencePlaybackState(track: "Song", status: .paused, positionSec: 1, seq: 3)
+        let text = try WireCodec.encode(.stateUpdate(state), from: "aaa", nowMs: 1)
+        guard case let .message(.stateUpdate(decoded), _) = WireCodec.decode(text) else {
+            Issue.record("expected state_update")
+            return
+        }
+        #expect(decoded.shuffle == nil)
+        #expect(decoded.repeat == nil)
+        #expect(!text.contains("shuffle"))
+        #expect(!text.contains("repeat"))
+    }
+
+    @Test
+    func stateUpdateInvalidRepeatStringDecodesNil() {
+        // Tolerant receiver: an unknown repeat value is dropped, never
+        // malformed, never a disconnect.
+        let json = "{\"v\":1,\"type\":\"state_update\",\"id\":\"i\",\"from\":\"aaa\",\"ts\":1," +
+            "\"track\":\"T\",\"status\":\"playing\",\"positionSec\":3,\"seq\":2," +
+            "\"shuffle\":true,\"repeat\":\"forever\"}"
+        guard case let .message(.stateUpdate(state), _) = WireCodec.decode(json) else {
+            Issue.record("expected state_update")
+            return
+        }
+        #expect(state.shuffle == true)
+        #expect(state.repeat == nil)
+    }
+
+    @Test
     func stateUpdateWithoutArtistDecodesNil() {
         let json = "{\"v\":1,\"type\":\"state_update\",\"id\":\"i\",\"from\":\"aaa\",\"ts\":1," +
             "\"track\":\"T\",\"status\":\"paused\",\"positionSec\":3,\"seq\":2}"

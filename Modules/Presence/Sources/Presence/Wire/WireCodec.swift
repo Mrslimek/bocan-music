@@ -43,6 +43,12 @@ public enum WireCodec {
             if let playbackId = state.playbackId {
                 object["playbackId"] = playbackId
             }
+            if let shuffle = state.shuffle {
+                object["shuffle"] = shuffle
+            }
+            if let repeatMode = state.repeat {
+                object["repeat"] = repeatMode.rawValue
+            }
 
         case let .test(text):
             object["text"] = text
@@ -182,7 +188,9 @@ public enum WireCodec {
                 seq: seq,
                 artist: object["artist"] as? String,
                 trackHash: object["trackHash"] as? String,
-                playbackId: object["playbackId"] as? String
+                playbackId: object["playbackId"] as? String,
+                shuffle: object["shuffle"] as? Bool,
+                repeat: (object["repeat"] as? String).flatMap(PresenceRepeatMode.init(rawValue:))
             )
             return .message(.stateUpdate(state), envelope: envelope)
 

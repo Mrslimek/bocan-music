@@ -906,6 +906,21 @@ extension BocanApp {
 
             case .previous:
                 try await player.previous()
+
+            case .repeatOff:
+                await player.setRepeat(.off)
+
+            case .repeatAll:
+                await player.setRepeat(.all)
+
+            case .repeatOne:
+                await player.setRepeat(.one)
+
+            case .shuffleOn:
+                await player.setShuffle(true)
+
+            case .shuffleOff:
+                await player.setShuffle(false)
             }
             return true
         } catch is CancellationError {
@@ -954,6 +969,21 @@ extension BocanApp {
 
         case .previous:
             await player.previous()
+
+        case .repeatOff:
+            await player.setRepeat(.off)
+
+        case .repeatAll:
+            await player.setRepeat(.all)
+
+        case .repeatOne:
+            await player.setRepeat(.one)
+
+        case .shuffleOn:
+            await player.setShuffle(true)
+
+        case .shuffleOff:
+            await player.setShuffle(false)
         }
     }
 
