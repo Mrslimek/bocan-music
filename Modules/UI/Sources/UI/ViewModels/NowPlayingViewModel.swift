@@ -21,20 +21,101 @@ import UserNotifications
 public final class NowPlayingViewModel {
     // MARK: - Observable state
 
+    // The seven display properties are computed over `_`-prefixed backing
+    // stores (ADR-097 amendment): while a shared-session remote stint (or an
+    // in-flight takeover) is active, they render the REMOTE stint instead of
+    // the local player; otherwise they are the local values, unchanged. The
+    // @Observable macro instruments the computed getters, so views reading
+    // them depend on `remoteDisplay`/`displayTick` exactly as they did on the
+    // former stored properties.
+
+    /// The display override for an active remote stint; nil = local display.
+    private var remoteDisplay: RemoteDisplay?
+    /// Bumped every 0.5 s while a remote stint is displayed so the
+    /// dead-reckoned `position` getter re-invalidates its readers. Not read
+    /// on the local path, so local rendering keeps its exact today cadence.
+    private var displayTick = 0
+    /// The stint key whose media was last resolved (metadata/artwork work
+    /// runs only on change).
+    @ObservationIgnored private var lastRemoteDisplayKey: String?
+
+    private var _artwork: NSImage?
+    private var _title = ""
+    private var _artist = ""
+    private var _album = ""
+    private var _duration: TimeInterval = 0
+    private var _position: TimeInterval = 0
+    private var _isPlaying = false
+
     /// Cover art for the current track, or `nil` when nothing is playing.
-    public private(set) var artwork: NSImage?
+    public private(set) var artwork: NSImage? {
+        get {
+            if let display = self.remoteDisplay { return display.artwork }
+            return self._artwork
+        }
+        set { self._artwork = newValue }
+    }
+
     /// Track title of the current item, or empty string when idle.
-    public private(set) var title = ""
+    public private(set) var title: String {
+        get {
+            if let display = self.remoteDisplay { return display.trackTitle }
+            return self._title
+        }
+        set { self._title = newValue }
+    }
+
     /// Primary artist of the current item.
-    public private(set) var artist = ""
+    public private(set) var artist: String {
+        get {
+            if let display = self.remoteDisplay { return display.artist }
+            return self._artist
+        }
+        set { self._artist = newValue }
+    }
+
     /// Album name of the current item.
-    public private(set) var album = ""
-    /// Total duration of the current track in seconds.
-    public private(set) var duration: TimeInterval = 0
-    /// Current playback position in seconds.
-    public private(set) var position: TimeInterval = 0
-    /// `true` while the engine is actively playing.
-    public private(set) var isPlaying = false
+    public private(set) var album: String {
+        get {
+            if let display = self.remoteDisplay { return display.album }
+            return self._album
+        }
+        set { self._album = newValue }
+    }
+
+    /// Total duration of the current track in seconds (0 = unknown).
+    public private(set) var duration: TimeInterval {
+        get {
+            if let display = self.remoteDisplay { return display.duration ?? 0 }
+            return self._duration
+        }
+        set { self._duration = newValue }
+    }
+
+    /// Current playback position in seconds. For a remote stint this
+    /// dead-reckons from the stint's authoritative (positionSec, updatedAtMs)
+    /// pair at read time while the peer reports playing; unreachable/gone
+    /// freezes at the last-known value.
+    public private(set) var position: TimeInterval {
+        get {
+            if let display = self.remoteDisplay {
+                _ = self.displayTick
+                return RemoteDisplay.deadReckoned(display)
+            }
+            return self._position
+        }
+        set { self._position = newValue }
+    }
+
+    /// `true` while the engine is actively playing (or the displayed remote
+    /// stint's peer reports playing).
+    public private(set) var isPlaying: Bool {
+        get {
+            if let display = self.remoteDisplay { return display.isPlaying }
+            return self._isPlaying
+        }
+        set { self._isPlaying = newValue }
+    }
     /// Output volume in the range 0.0–1.0.
     public var volume: Float = 1.0
     /// `true` when shuffle mode is active.
@@ -102,6 +183,13 @@ public final class NowPlayingViewModel {
     /// menu bar and media keys never touch the session.
     public var sessionViewModel: SessionViewModel?
 
+    /// Resolves a remote stint's `trackHash` against the local library
+    /// (contract section 8: identical libraries mean the local copy exists).
+    /// Set once by the app graph (`TrackHashIndex.track(forHash:)`); nil
+    /// until then (and in tests), in which case the stint renders without
+    /// artist/album/artwork and an unknown duration.
+    public var remoteTrackResolver: (@Sendable (String) async -> Track?)?
+
     // MARK: - Internal
 
     private let engine: any Transport
@@ -118,6 +206,7 @@ public final class NowPlayingViewModel {
     @ObservationIgnored private nonisolated(unsafe) var sleepTimerTask: Task<Void, Never>?
     @ObservationIgnored private nonisolated(unsafe) var scrobbleStatsTask: Task<Void, Never>?
     @ObservationIgnored private nonisolated(unsafe) var currentTrackTask: Task<Void, Never>?
+    @ObservationIgnored private nonisolated(unsafe) var sessionDisplayTask: Task<Void, Never>?
     @ObservationIgnored private nonisolated(unsafe) var initialItemSyncTask: Task<Void, Never>?
     @ObservationIgnored private nonisolated(unsafe) var queueChangesTask: Task<Void, Never>?
     @ObservationIgnored private nonisolated(unsafe) var streamTitleTask: Task<Void, Never>?
@@ -181,6 +270,7 @@ public final class NowPlayingViewModel {
         self.database = database
         self.subsonicCoverArtProvider = subsonicCoverArtProvider
         self.startObservingState()
+        self.startSessionDisplayTick()
         if let qp = engine as? QueuePlayer {
             self.startObservingCurrentTrack(qp)
             self.startObservingSleepTimer(qp)
@@ -210,6 +300,7 @@ public final class NowPlayingViewModel {
         self.queueChangesTask?.cancel()
         self.streamTitleTask?.cancel()
         self.markerTask?.cancel()
+        self.sessionDisplayTask?.cancel()
     }
 
     private func startObservingScrobbleStats(_ repo: ScrobbleQueueRepository) {
@@ -727,6 +818,79 @@ public extension NowPlayingViewModel {
 
 // MARK: - NowPlayingViewModel private helpers
 
+/// The display override payload for an active remote stint (contract
+/// section 8, main-window display-source swap; ADR-097 amendment).
+///
+/// Equatable so the 0.5 s display tick only republishes on real changes;
+/// position is deliberately NOT stored display-ready — `positionBaseSec` and
+/// `updatedAtMs` dead-reckon at read time so the value advances without
+/// rewriting this struct every tick.
+private struct RemoteDisplay: Equatable {
+    let peerName: String
+    let trackTitle: String
+    var artist: String
+    var album: String
+    var artwork: NSImage?
+    /// The resolved local track's duration, or nil when the hash is not in
+    /// the local library (`library_unsynced`) — the scrub bar then renders
+    /// exactly like the existing unknown-duration handling.
+    let duration: TimeInterval?
+    let positionBaseSec: Double
+    let updatedAtMs: Double
+    let isPlaying: Bool
+    let reachability: SessionView.Reachability
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.peerName == rhs.peerName
+            && lhs.trackTitle == rhs.trackTitle
+            && lhs.artist == rhs.artist
+            && lhs.album == rhs.album
+            && lhs.artwork === rhs.artwork
+            && lhs.duration == rhs.duration
+            && lhs.positionBaseSec == rhs.positionBaseSec
+            && lhs.updatedAtMs == rhs.updatedAtMs
+            && lhs.isPlaying == rhs.isPlaying
+            && lhs.reachability == rhs.reachability
+    }
+
+    /// The displayed position: advanced by elapsed wall time while the peer
+    /// reports playing and is connected; frozen at the last-known value
+    /// otherwise (contract section 8's presentation-only dead reckoning,
+    /// same rule as `RemoteSessionPanel.deadReckoned`).
+    static func deadReckoned(_ display: Self) -> TimeInterval {
+        guard display.isPlaying, display.reachability == .connected else {
+            return display.positionBaseSec
+        }
+        let elapsed = max(0, Date().timeIntervalSince1970 * 1000 - display.updatedAtMs) / 1000
+        return display.positionBaseSec + elapsed
+    }
+}
+
+/// The pure display inputs mapped from a `SessionView.Source` (unit-tested):
+/// what the display tick needs to build a `RemoteDisplay`.
+struct RemoteDisplayValues {
+    let peerName: String
+    let reachability: SessionView.Reachability
+    let trackHash: String
+    let fallbackTitle: String
+    let isPlaying: Bool
+    let positionBaseSec: Double
+    let updatedAtMs: Double
+    /// Change key gating the metadata/artwork resolution:
+    /// playbackId|trackHash|status|reachability (or takeover|hash).
+    let key: String
+}
+
+/// The library-side media resolved for a stint's trackHash.
+struct RemoteMedia {
+    let trackTitle: String?
+    let artist: String
+    let album: String
+    let artwork: NSImage?
+    /// nil when the hash is not in the local library (`library_unsynced`).
+    let duration: TimeInterval?
+}
+
 extension NowPlayingViewModel {
     /// Resolves the starting podcast rate when an episode begins: a per-show
     /// override wins, else the global `podcast.playback.rate` default, else 1.0;
@@ -735,6 +899,157 @@ extension NowPlayingViewModel {
     nonisolated static func resolvePodcastRate(showSpeed: Double?, globalRate: Double) -> Float {
         let effective = showSpeed ?? (globalRate > 0 ? globalRate : 1.0)
         return Float(max(0.5, min(2.0, effective)))
+    }
+}
+
+extension NowPlayingViewModel {
+    // MARK: Shared-session display source (contract section 8, ADR-097)
+    /// Whether the source renders remotely (any reachability, or a takeover
+    /// in flight).
+    nonisolated static func isRemoteSource(_ source: SessionView.Source) -> Bool {
+        switch source {
+        case .local:
+            false
+
+        case .remote, .takeoverInFlight:
+            true
+        }
+    }
+
+    /// The pure mapping SessionView.Source -> display inputs (unit-tested):
+    /// nil for `.local`; for a remote stint the stint's own last-known pair,
+    /// playing only while connected; for a takeover the takeover's position
+    /// and an imminent-play state keyed on the takeover's hash.
+    nonisolated static func remoteDisplayValues(for source: SessionView.Source) -> RemoteDisplayValues? {
+        switch source {
+        case .local:
+            return nil
+
+        case let .remote(stint):
+            let lastKnown = stint.lastKnown
+            return RemoteDisplayValues(
+                peerName: stint.peerName,
+                reachability: stint.reachability,
+                trackHash: lastKnown.trackHash,
+                fallbackTitle: lastKnown.trackTitle,
+                isPlaying: lastKnown.status == .playing && stint.reachability == .connected,
+                positionBaseSec: lastKnown.positionSec,
+                updatedAtMs: lastKnown.updatedAtMs,
+                key: "\(lastKnown.playbackId)|\(lastKnown.trackHash)|\(lastKnown.status.rawValue)|\(stint.reachability)"
+            )
+
+        case let .takeoverInFlight(takeover):
+            return RemoteDisplayValues(
+                peerName: takeover.peerName,
+                reachability: .connected,
+                trackHash: takeover.trackHash,
+                fallbackTitle: "",
+                isPlaying: true,
+                positionBaseSec: takeover.positionSec,
+                updatedAtMs: Date().timeIntervalSince1970 * 1000,
+                key: "takeover|\(takeover.trackHash)"
+            )
+        }
+    }
+
+    /// Rebuilds `remoteDisplay` from the session view. The metadata
+    /// (artist/album/artwork) and the Track resolution only run when the
+    /// stint key changes (`playbackId|trackHash|status|reachability` or the
+    /// takeover hash) — never per tick, and never through
+    /// `setCurrentTrack`/`resolveMetadata`, which fire notifications and
+    /// mutate the local player's identity fields.
+    func refreshRemoteDisplay() async {
+        guard let session = self.sessionViewModel?.session,
+              Self.isRemoteSource(session.source),
+              let values = Self.remoteDisplayValues(for: session.source) else {
+            self.remoteDisplay = nil
+            return
+        }
+
+        if values.key != self.lastRemoteDisplayKey {
+            self.lastRemoteDisplayKey = values.key
+            let media = await self.resolveRemoteMedia(trackHash: values.trackHash)
+            let display = RemoteDisplay(
+                peerName: values.peerName,
+                trackTitle: media.trackTitle ?? values.fallbackTitle,
+                artist: media.artist,
+                album: media.album,
+                artwork: media.artwork,
+                duration: media.duration,
+                positionBaseSec: values.positionBaseSec,
+                updatedAtMs: values.updatedAtMs,
+                isPlaying: values.isPlaying,
+                reachability: values.reachability
+            )
+            if display != self.remoteDisplay {
+                self.remoteDisplay = display
+            }
+        }
+
+        // The tick itself: drives the dead-reckoned position re-render.
+        self.displayTick += 1
+    }
+
+    /// The library-side media for a stint's `trackHash`: the local Track (nil
+    /// when the hash is unsynced), its artist/album names, cover art and
+    /// duration. Minimal replication of `resolveMetadata`'s artwork path —
+    /// deliberately no track-change notification and no write-back to the
+    /// local identity fields.
+    func resolveRemoteMedia(trackHash: String) async -> RemoteMedia {
+        guard let resolver = self.remoteTrackResolver else {
+            return RemoteMedia(trackTitle: nil, artist: "", album: "", artwork: nil, duration: nil)
+        }
+        guard let track = await resolver(trackHash) else {
+            return RemoteMedia(trackTitle: nil, artist: "", album: "", artwork: nil, duration: nil)
+        }
+        var artist = ""
+        var album = ""
+        var artwork: NSImage?
+        do {
+            if let artistID = track.artistID {
+                artist = try await self.database.read { db in
+                    try Artist.fetchOne(db, key: artistID)?.name ?? ""
+                }
+            }
+            if let albumID = track.albumID {
+                let albumRecord = try await self.database.read { db in
+                    try Album.fetchOne(db, key: albumID)
+                }
+                album = albumRecord?.title ?? ""
+                if let hash = track.coverArtHash ?? albumRecord?.coverArtHash,
+                   let path = try await self.database.read({ db in
+                       try CoverArt.fetchOne(db, key: hash)?.path
+                   }) {
+                    artwork = await ArtworkLoader.shared.image(at: path)
+                }
+            }
+        } catch {
+            self.log.warning("nowplaying.remote.resolve.failed", [
+                "hash": String(trackHash.prefix(12)),
+                "error": String(reflecting: error),
+            ])
+        }
+        return RemoteMedia(
+            trackTitle: track.title,
+            artist: artist,
+            album: album,
+            artwork: artwork,
+            duration: track.duration
+        )
+    }
+
+    /// The 0.5 s display tick (same cadence as `startPollingPosition`):
+    /// recomputes the remote display override, and while one is active bumps
+    /// `displayTick` so the dead-reckoned `position` readers re-render. When
+    /// the session is local the override clears and nothing ticks.
+    func startSessionDisplayTick() {
+        self.sessionDisplayTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { break }
+                await self.refreshRemoteDisplay()
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
+        }
     }
 }
 

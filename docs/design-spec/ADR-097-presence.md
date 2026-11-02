@@ -332,3 +332,32 @@ budget. `Resources/Info.plist` gains `_musicshare._tcp` under
   single authoritative pair and nothing is written back.
 - The conflict banner mirrors the engine's conflict episodes: it cites the
   device names, never auto-dismisses, and never auto-resolves.
+
+## Amendment (2026-11-02, second): main-window display-source swap
+
+- The main window's now-playing surface RENDERS the shared session: while
+  `SessionView.source` is `.remote` (any reachability) or
+  `.takeoverInFlight`, `NowPlayingViewModel`'s seven display properties
+  (title, artist, album, artwork, duration, position, isPlaying) return the
+  remote stint's values; on `.local` the getters return the unchanged local
+  backing stores (byte-identical behaviour).
+- Structure: the properties became computed over `_`-prefixed backing vars;
+  a `RemoteDisplay` override payload (Equatable) is rebuilt by a 0.5 s
+  display tick (same cadence as the local position poll) and a
+  `displayTick` counter re-invalidates the dead-reckoned `position` readers
+  only while a stint is displayed.
+- Remote metadata resolves through the LOCAL library by the stint's
+  `trackHash` (`TrackHashIndex.track(forHash:)`, injected as
+  `remoteTrackResolver`): title/artist/album/artwork/duration come from the
+  local copy; an unresolvable hash renders with an unknown duration
+  (`library_unsynced`), never an error surface.
+- Position dead-reckons at read time from the authoritative
+  (positionSec, updatedAtMs) pair while the peer reports playing AND is
+  connected; unreachable/gone freezes at the last-known value. Nothing is
+  written back.
+- The side banner becomes a compact single-line chip (status text +
+  "Take over here"); conflict rendering stays non-dismissing.
+- `nowPlayingTrackID` (and the other local identity fields) stay LOCAL on
+  purpose: love button, queue navigation, dock identity, the lyrics driver
+  and accessibility key on it; lyrics and love continue to follow the local
+  player this round.

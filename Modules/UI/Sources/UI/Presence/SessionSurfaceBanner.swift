@@ -1,147 +1,125 @@
 import Presence
 import SwiftUI
 
-/// The compact shared-session line the MAIN WINDOW shows above the play bar
-/// (contract section 8). Renders nothing while the source is `.local`.
+/// The compact shared-session chip the MAIN WINDOW shows above the play bar
+/// (contract section 8; ADR-097 amendment). The main now-playing surface
+/// itself carries the remote stint's content (display-source swap in
+/// `NowPlayingViewModel`), so this is a single-line status chip: who owns the
+/// stint and whether the connection is alive, plus the "Take over here"
+/// affordance. Renders nothing while the source is `.local`.
 ///
 /// Connection is a different axis from the session: an unreachable or gone
-/// stint keeps its last-known state visible here with warning styling; it
-/// never silently flips the strip back to local. Position display dead-reckons
-/// in the view only (`SessionView.LastKnown` stays authoritative); nothing
-/// here writes back.
+/// stint keeps its chip in warning styling and the main surface keeps
+/// rendering the last-known state — it never silently flips back to local.
 struct SessionSurfaceBanner: View {
     let session: SessionViewModel
 
-    /// View-layer clock for the dead-reckoned position display only.
-    @State private var displayNow = Date()
-
-    private var stint: SessionView.RemoteStint? {
-        if case let .remote(stint) = self.session.session.source {
-            return stint
-        }
-        return nil
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 4) {
             if let conflict = self.session.session.conflict {
-                self.conflictBanner(conflict)
+                self.conflictChip(conflict)
             }
-            if let stint = self.stint {
-                self.remoteRow(stint)
-            } else if case let .takeoverInFlight(takeover) = self.session.session.source {
-                self.takeoverRow(takeover)
-            }
-        }
-        .task {
-            // Only drives the dead-reckoned position display while the
-            // session shows a remote stint; presentation, never stored.
-            while !Task.isCancelled {
-                if self.stint?.lastKnown.status == .playing {
-                    self.displayNow = Date()
-                }
-                try? await Task.sleep(nanoseconds: 500_000_000)
+            switch self.session.session.source {
+            case .local:
+                EmptyView()
+
+            case let .remote(stint):
+                self.stintChip(stint)
+
+            case let .takeoverInFlight(takeover):
+                self.takeoverChip(takeover)
             }
         }
+        .padding(.horizontal, 16)
     }
 
     // MARK: - Pieces
 
     @ViewBuilder
-    private func remoteRow(_ stint: SessionView.RemoteStint) -> some View {
+    private func stintChip(_ stint: SessionView.RemoteStint) -> some View {
         let connected = stint.reachability == .connected
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Image(systemName: "paperplane.fill")
-                .scaledSystemFont(size: 11, weight: .medium)
+                .scaledSystemFont(size: 10, weight: .medium)
                 .foregroundStyle(connected ? Color.textSecondary : Color.warningTint)
                 .accessibilityHidden(true)
-            Text(verbatim: Self.trackText(stint.lastKnown))
-                .font(Typography.subheadline)
-                .foregroundStyle(Color.textSecondary)
-                .lineLimit(1)
-            Text(verbatim: Self.positionText(stint, now: self.displayNow))
+            Text(verbatim: connected
+                ? L10n.string("Playing on \(stint.peerName)")
+                : L10n.string("Connection lost — showing last known state from \(stint.peerName)"))
                 .font(Typography.caption)
+                .foregroundStyle(connected ? Color.textSecondary : Color.warningTint)
+                .lineLimit(1)
+            // A takeover is legal even while the stint peer is unreachable
+            // (section 8), so the affordance stays for both reachabilities.
+            Text(L10n.string("Take over here"))
+                .font(Typography.mini)
                 .foregroundStyle(Color.textSecondary)
-                .monospacedDigit()
-            if connected {
-                Text(L10n.string("Playing on \(stint.peerName)"))
-                    .font(Typography.mini)
-                    .foregroundStyle(Color.textSecondary)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .overlay {
-                        Capsule(style: .continuous)
-                            .strokeBorder(Color.textTertiary, lineWidth: 1)
-                    }
-            } else {
-                Text(L10n.string("Connection lost — showing last known state from \(stint.peerName)"))
-                    .font(Typography.caption)
-                    .foregroundStyle(Color.warningTint)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 12)
-            Button(L10n.string("Take over here")) {
-                Task { await self.session.takeOverHere() }
-            }
-            .help(L10n.string("Resumes this track on this Mac from your own copy, at the peer's position."))
+                .underline()
+                .onTapGesture {
+                    Task { await self.session.takeOverHere() }
+                }
+                .help(L10n.string("Resumes this track on this Mac from your own copy, at the peer's position."))
         }
-        .padding(.horizontal, 16)
-        .frame(height: 30)
-        .background(.bar)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 3)
+        .background {
+            Capsule(style: .continuous)
+                .fill(.bar)
+                .overlay {
+                    Capsule(style: .continuous)
+                        .strokeBorder(connected ? Color.textTertiary : Color.warningTint, lineWidth: 1)
+                }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(L10n.string("Shared session"))
     }
 
     @ViewBuilder
-    private func takeoverRow(_ takeover: SessionView.RemoteTakeover) -> some View {
-        HStack(spacing: 8) {
+    private func takeoverChip(_ takeover: SessionView.RemoteTakeover) -> some View {
+        HStack(spacing: 6) {
             ProgressView()
-                .controlSize(.small)
-            Text(L10n.string("Taking over from \(takeover.peerName)…"))
-                .font(Typography.subheadline)
+                .controlSize(.mini)
+            Text(verbatim: L10n.string("Taking over from \(takeover.peerName)…"))
+                .font(Typography.caption)
                 .foregroundStyle(Color.textSecondary)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 30)
-        .background(.bar)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 3)
+        .background {
+            Capsule(style: .continuous)
+                .fill(.bar)
+                .overlay {
+                    Capsule(style: .continuous)
+                        .strokeBorder(Color.textTertiary, lineWidth: 1)
+                }
+        }
     }
 
     @ViewBuilder
-    private func conflictBanner(_ conflict: SessionView.Conflict) -> some View {
-        HStack(spacing: 8) {
+    private func conflictChip(_ conflict: SessionView.Conflict) -> some View {
+        HStack(spacing: 6) {
             Image(systemName: "exclamationmark.triangle.fill")
+                .scaledSystemFont(size: 10)
                 .foregroundStyle(Color.warningTint)
                 .accessibilityHidden(true)
-            Text(L10n.string("Both devices are playing: \(conflict.deviceNames.joined(separator: " + "))"))
+            Text(verbatim: L10n.string("Both devices are playing: \(conflict.deviceNames.joined(separator: " + "))"))
                 .font(Typography.caption)
                 .foregroundStyle(Color.warningTint)
-                .lineLimit(2)
+                .lineLimit(1)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
-        .background(.regularMaterial)
-        .overlay(alignment: .bottom) {
-            Divider()
+        .padding(.horizontal, 10)
+        .padding(.vertical, 3)
+        .background {
+            Capsule(style: .continuous)
+                .fill(.bar)
+                .overlay {
+                    Capsule(style: .continuous)
+                        .strokeBorder(Color.warningTint, lineWidth: 1)
+                }
         }
-        // Deliberately no dismissal affordance and no timer: the banner
-        // clears only when the engine clears the conflict (section 8 never
+        // Deliberately no dismissal affordance and no timer: the chip clears
+        // only when the engine clears the conflict (section 8 never
         // auto-resolves).
-    }
-
-    // MARK: - Formatting
-
-    private static func trackText(_ lastKnown: SessionView.LastKnown) -> String {
-        lastKnown.trackTitle.isEmpty ? L10n.string("Nothing") : lastKnown.trackTitle
-    }
-
-    /// Dead-reckoned clock, computed on render from the authoritative
-    /// (positionSec, updatedAtMs) pair. The estimate never leaves the view.
-    private static func positionText(_ stint: SessionView.RemoteStint, now: Date) -> String {
-        let position = RemoteSessionPanel.deadReckoned(lastKnown: stint.lastKnown, now: now)
-        let minutes = Int(position) / 60
-        let seconds = Int(position) % 60
-        return String(format: "%d:%02d", minutes, seconds)
     }
 }

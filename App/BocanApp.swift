@@ -1345,6 +1345,12 @@ extension BocanApp {
             await Self.applyLocalSessionCommand(action, position: position, player: nowPlayingViewModel)
         }
         nowPlayingViewModel.sessionViewModel = sessionViewModel
+        // Main-window display-source swap (contract section 8, ADR-097
+        // amendment): remote stint metadata resolves through the local
+        // library by the stint's trackHash.
+        nowPlayingViewModel.remoteTrackResolver = { [trackHashIndex] hash in
+            await trackHashIndex.track(forHash: hash)
+        }
         Self.installPresenceWakeObserver(presence: presence)
         if UserDefaults.standard.bool(forKey: "presence.enabled") {
             Task { [presence] in
