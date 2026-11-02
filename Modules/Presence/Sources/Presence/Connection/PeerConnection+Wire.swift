@@ -44,6 +44,9 @@ extension PeerConnection {
         case let .command(command):
             self.onEvent(.message(.command(command), envelope: envelope))
 
+        case let .queue(message):
+            self.onEvent(.message(.queue(message), envelope: envelope))
+
         case let .goodbye(reason):
             self.onEvent(.message(.goodbye(reason: reason), envelope: envelope))
         }

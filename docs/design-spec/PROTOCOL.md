@@ -17,6 +17,11 @@ actions (`repeat_off` | `repeat_all` | `repeat_one` | `shuffle_on` | `shuffle_of
 and two optional `state_update` fields (`shuffle`: bool, `repeat`: `off`|`all`|`one`)
 so peers can control AND observe each other's queue modes. All optional under the
 tolerant-receiver rules; v1 peers interoperate unchanged.
+Changelog: 2026-11-02 (2) — added the optional **queue sharing** extension
+(see §9): a new `queue` message carrying the sender's playback queue as an ordered
+list of `trackHash` values, so a taker (§8) can reconstruct the stint owner's queue
+locally instead of inheriting a single track. Tolerant-receiver rules apply;
+v1 peers interoperate unchanged.
 
 ## 1. Topology
 
@@ -251,3 +256,42 @@ Required measurements (both platforms, log at info level):
 
 Audio, file transfer, message relay, encryption/identity verification, NAT/WAN traversal,
 background services, conflict-resolution policy, playback synchronization.
+## 9. Queue sharing (optional v1 extension, added 2026-11-02)
+
+Lets a peer know the stint owner's PLAYBACK QUEUE (§8 track identity: every entry is
+a `trackHash`; identical libraries mean the receiver can reconstruct the same queue
+from its own files), so take-over preserves what plays next instead of handing over
+a single track. Wire version stays `1`; tolerant-receiver rules apply.
+
+### queue
+```json
+{"v":1,"type":"queue","id":"…","from":"…","ts":…,
+ "current":3,
+ "hashes":["a1b2c3…","c3d4e5…","e5f6a7…"]}
+```
+- `hashes`: the sender's playback queue as an ORDERED array of lowercase-hex
+  SHA-256 values (same definition as §8 `trackHash`). MAY be a bounded window
+  around the current entry instead of the whole queue; senders SHOULD include the
+  current entry and the next 50 whenever the queue is larger. An empty array is
+  valid (empty queue). Senders MUST NOT exceed 1000 entries per message.
+- `current`: 0-based index into `hashes` of the currently-playing entry; omit or
+  use -1 when nothing in the array is playing (stopped/unknown).
+- Senders send `queue` (a) once right after each handshake completes, alongside the
+  initial `state_update`, and (b) whenever the queue's CONTENT changes (track
+  advance, enqueue/dequeue, reorder). Bursts SHOULD be debounced (recommend
+  ≥ 500 ms). Position ticks and play/pause changes MUST NOT trigger a `queue`.
+- Receivers store the latest `queue` per peer, replacing it whole on every arrival
+  (latest wins). Peers without §9 support ignore the message per the generic
+  unknown-type rule. Malformed payloads (non-hex strings, non-array `hashes`) →
+  log `message_malformed`, ignore, never disconnect. The generic duplicate-`id`
+  rule applies.
+- Alignment: a receiver aligns the snapshot to the owner's current stint by
+  matching the stint's `trackHash` against `hashes` (on duplicates, the occurrence
+  nearest `current` wins). The `current` index is advisory, not authoritative.
+- Takeover flow (§8, updated): a taker reconstructs its local queue from the
+  owner's latest `queue` snapshot — resolving each hash through its library; hashes
+  missing locally are SKIPPED (log `library_unsynced` once per takeover with a
+  count, not per entry), the reconstructed queue is positioned at the aligned
+  current entry, and the §8 takeover (fresh `playbackId`, seek to `positionSec`)
+  proceeds unchanged. A taker holding no `queue` snapshot takes over the single
+  current track, as before this extension.

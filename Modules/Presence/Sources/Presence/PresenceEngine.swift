@@ -115,6 +115,21 @@ public actor PresenceEngine {
     var takeoverPrevious: SessionView?
     var tap: PlaybackTap?
 
+    // MARK: Queue sharing (contract section 9)
+
+    var queueObserveTask: Task<Void, Never>?
+    /// The pending debounced broadcast; nil when no send is scheduled.
+    var queueSendTask: Task<Void, Never>?
+    /// Lazily resolved track hashes, cached per trackID (nil = unresolvable).
+    var queueHashCache: [Int64: String?] = [:]
+    /// What was last sent (or is being sent), to suppress no-op broadcasts.
+    var lastQueueFingerprint: QueueFingerprint?
+    /// The freshest snapshot awaiting the debounce fire.
+    var pendingQueueFingerprint: QueueFingerprint?
+    /// Where live queue snapshots come from (wired from `player` at start;
+    /// replaceable by tests via `setQueueSnapshotForTesting`).
+    var queueSnapshotSource: (@Sendable () async -> QueueSnapshot?)?
+
     // MARK: Lifecycle
 
     var running = false
@@ -222,6 +237,14 @@ public actor PresenceEngine {
             let tap = await self.makePlaybackTap(player: player)
             await tap.start()
             self.tap = tap
+            self.startQueueObservation(player: player)
+            self.queueSnapshotSource = { [weak player] in
+                guard let player else { return nil }
+                return QueueSnapshot(
+                    items: await player.queue.items,
+                    currentIndex: await player.queue.currentIndex
+                )
+            }
         }
 
         self.tickTask = Task { [weak self] in
@@ -250,6 +273,7 @@ public actor PresenceEngine {
         self.rebrowseTask = nil
         await self.tap?.stop()
         self.tap = nil
+        self.stopQueueObservation()
 
         let deadline = Date().addingTimeInterval(1.2)
         let connected = Array(self.connections.values)

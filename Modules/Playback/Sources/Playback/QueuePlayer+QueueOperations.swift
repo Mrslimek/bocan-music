@@ -224,7 +224,9 @@ public extension QueuePlayer {
     /// Toggle shuffle on/off.
     func setShuffle(_ on: Bool, strategy: (any ShuffleStrategy)? = nil) async {
         await self.queue.setShuffle(on)
-        await self.emitModeChange()
+        // Fire-and-forget so the re-emit can never hang the caller on a
+        // stream with no consumer.
+        Task { await self.emitModeChange() }
     }
 
     /// Set the playback volume [0–1], forwarded to the audio engine.
@@ -240,7 +242,8 @@ public extension QueuePlayer {
     /// Change the repeat mode.
     func setRepeat(_ mode: RepeatMode) async {
         await self.queue.setRepeatMode(mode)
-        await self.emitModeChange()
+        // Fire-and-forget, as in `setShuffle`.
+        Task { await self.emitModeChange() }
     }
 
     /// Re-emits the current playback state with the current queue modes so

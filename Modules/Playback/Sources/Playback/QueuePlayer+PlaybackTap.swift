@@ -35,6 +35,31 @@ final class PlaybackTapHub: Sendable {
     }
 }
 
+/// The per-subscriber registry behind `QueuePlayer`'s queue-snapshot fan-out
+/// (same shape as `PlaybackTapHub`): every subscriber gets an independent
+/// stream seeded with the current queue.
+final class QueueSnapshotHub: Sendable {
+    private let subscribers = Mutex<[UUID: AsyncStream<QueueSnapshot>.Continuation]>([:])
+
+    func add(_ id: UUID, _ continuation: AsyncStream<QueueSnapshot>.Continuation) {
+        self.subscribers.withLock { $0[id] = continuation }
+    }
+
+    func remove(_ id: UUID) {
+        _ = self.subscribers.withLock { $0.removeValue(forKey: id) }
+    }
+
+    var subscriberCount: Int {
+        self.subscribers.withLock { $0.count }
+    }
+
+    func emit(_ snapshot: QueueSnapshot) {
+        for continuation in self.subscribers.withLock({ $0.values }) {
+            continuation.yield(snapshot)
+        }
+    }
+}
+
 // MARK: - QueuePlayer + Playback tap
 
 extension QueuePlayer {
@@ -77,5 +102,38 @@ extension QueuePlayer {
             shuffle: shuffleState != .off,
             repeat: repeatMode
         )
+    }
+}
+
+// MARK: - Queue snapshot fan-out
+
+extension QueuePlayer {
+    /// Emits the current queue contents first, then again whenever the queue
+    /// changes (any `QueueChange` — the consumer filters what it cares about,
+    /// e.g. content-vs-mode changes). Each call returns an independent stream
+    /// registered before the stream is returned.
+    public func queueSnapshotUpdates() async -> AsyncStream<QueueSnapshot> {
+        let (stream, continuation) = AsyncStream.makeStream(of: QueueSnapshot.self)
+        let id = UUID()
+        self.queueSnapshotHub.add(id, continuation)
+        continuation.yield(QueueSnapshot(
+            items: await self.queue.items,
+            currentIndex: await self.queue.currentIndex
+        ))
+        continuation.onTermination = { [weak self] _ in
+            guard let self else { return }
+            Task { await self.queueSnapshotHub.remove(id) }
+        }
+        return stream
+    }
+
+    /// The single funnel for queue-change emission, called from the one
+    /// `changes()` consumer (`subscribeToQueueChanges`).
+    func emitQueueSnapshot() async {
+        guard self.queueSnapshotHub.subscriberCount > 0 else { return }
+        self.queueSnapshotHub.emit(QueueSnapshot(
+            items: await self.queue.items,
+            currentIndex: await self.queue.currentIndex
+        ))
     }
 }

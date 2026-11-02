@@ -30,3 +30,18 @@ public struct PlaybackTapSnapshot: Sendable, Equatable {
         self.repeat = `repeat`
     }
 }
+
+/// A point-in-time copy of the playback queue: the ordered items and the
+/// current index. Delivered through `QueuePlayer.queueSnapshotUpdates()` so
+/// non-UI consumers (the Presence subsystem broadcasts the queue as track
+/// hashes, protocol section 9) can observe queue CONTENT changes without
+/// competing for the single-consumer `changes()` stream.
+public struct QueueSnapshot: Sendable, Equatable {
+    public let items: [QueueItem]
+    public let currentIndex: Int?
+
+    public init(items: [QueueItem], currentIndex: Int?) {
+        self.items = items
+        self.currentIndex = currentIndex
+    }
+}

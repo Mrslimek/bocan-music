@@ -37,6 +37,9 @@ extension PresenceEngine {
         case let .command(command):
             await self.applyInboundCommand(command, owner: owner)
 
+        case let .queue(message):
+            self.applyInboundQueue(message, owner: owner)
+
         case .hello, .helloAck, .ping, .pong:
             break // liveness messages are handled inside the connection actor
         }

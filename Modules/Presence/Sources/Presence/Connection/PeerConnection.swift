@@ -232,6 +232,13 @@ public actor PeerConnection {
         self.send(.command(command), replyTo: nil)
     }
 
+    /// Sends a `queue` snapshot (contract section 9). Fire-and-forget, like
+    /// `sendCommand`.
+    public func sendQueue(_ message: PresenceQueueMessage) {
+        guard !self.tornDown, self.phase == .ready else { return }
+        self.send(.queue(message), replyTo: nil)
+    }
+
     /// Sends `goodbye`, gives the frame a short flush window, then closes 1000.
     public func goodbye(reason: String) async {
         guard !self.tornDown else { return }

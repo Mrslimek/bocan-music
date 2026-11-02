@@ -204,6 +204,7 @@ enum Harness {
             _ playbackId: String
         ) async -> Void)? = nil,
         onSessionConflict: (@Sendable (_ peerIDs: [String]) async -> Void)? = nil,
+        trackHashProvider: @escaping @Sendable (Int64) async -> String? = { _ in nil },
         store: LogStore? = nil
     ) -> PresenceEngine {
         let log = store.map { store in AppLogger(category: .presence, store: store) } ?? AppLogger.make(.presence)
@@ -214,6 +215,7 @@ enum Harness {
             config: config,
             controlEnabled: controlEnabled,
             commandExecutor: executor,
+            trackHashProvider: trackHashProvider,
             onPeerBecameActive: onPeerBecameActive,
             onSessionConflict: onSessionConflict,
             log: log

@@ -60,6 +60,47 @@ struct WireCodecTests {
     }
 
     @Test
+    func queueRoundTripWithCurrent() throws {
+        // Queue sharing (protocol section 9, added 2026-11-02).
+        let message = PresenceQueueMessage(current: 3, hashes: [String(repeating: "a", count: 64), String(repeating: "b", count: 64)])
+        let text = try WireCodec.encode(.queue(message), from: "aaa", nowMs: 1)
+        guard case let .message(.queue(decoded), _) = WireCodec.decode(text) else {
+            Issue.record("expected queue")
+            return
+        }
+        #expect(decoded.current == 3)
+        #expect(decoded.hashes == message.hashes)
+        #expect(text.contains("\"type\":\"queue\""))
+        #expect(text.contains("\"current\":3"))
+    }
+
+    @Test
+    func queueRoundTripWithoutCurrentOmitsKey() throws {
+        let message = PresenceQueueMessage(current: nil, hashes: [])
+        let text = try WireCodec.encode(.queue(message), from: "aaa", nowMs: 1)
+        guard case let .message(.queue(decoded), _) = WireCodec.decode(text) else {
+            Issue.record("expected queue")
+            return
+        }
+        #expect(decoded.current == nil)
+        #expect(decoded.hashes?.isEmpty == true)
+        #expect(!text.contains("current"))
+    }
+
+    @Test
+    func queueNonArrayHashesDecodeToNilForTheEngine() {
+        // Lenient decode: a non-array hashes payload survives the codec as
+        // hashes == nil; the ENGINE logs message_malformed (contract section 9).
+        let json = "{\"v\":1,\"type\":\"queue\",\"id\":\"i\",\"from\":\"aaa\",\"ts\":1," +
+            "\"hashes\":\"not-an-array\",\"current\":0}"
+        guard case let .message(.queue(decoded), _) = WireCodec.decode(json) else {
+            Issue.record("expected queue")
+            return
+        }
+        #expect(decoded.hashes == nil)
+    }
+
+    @Test
     func stateUpdateRoundTripWithPlaybackModes() throws {
         // Playback-mode extension (protocol 2026-11-02).
         let state = PresencePlaybackState(

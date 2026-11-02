@@ -48,6 +48,10 @@ public struct PresenceConfig: Sendable {
     /// overlap before a device reports `session_conflict` (the legal takeover
     /// handoff grace). Never auto-resolved.
     public let sessionConflictGrace: TimeInterval
+    /// Queue sharing (section 9): minimum seconds between `queue` broadcasts,
+    /// coalescing content-change bursts. Position ticks and play/pause never
+    /// trigger a send regardless of this value.
+    public let queueDebounce: TimeInterval
     /// Reconnect ladder (section 5).
     public let backoff: BackoffSchedule
     /// Whether the engine registers with and browses mDNS. Loopback tests run
@@ -79,6 +83,7 @@ public struct PresenceConfig: Sendable {
         bindsListener: Bool = true,
         transportStack: PresenceTransportStack = .automatic,
         sessionConflictGrace: TimeInterval = 2.0,
+        queueDebounce: TimeInterval = 0.5,
         advertiseName: String? = nil
     ) {
         self.serviceType = serviceType
@@ -97,6 +102,7 @@ public struct PresenceConfig: Sendable {
         self.bindsListener = bindsListener
         self.transportStack = transportStack
         self.sessionConflictGrace = sessionConflictGrace
+        self.queueDebounce = queueDebounce
         self.advertiseName = advertiseName
     }
 

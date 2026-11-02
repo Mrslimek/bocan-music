@@ -438,6 +438,12 @@ public actor QueuePlayer: Transport {
     /// `QueuePlayer+PlaybackTap.swift`. See `PlaybackTapHub` for why.
     var tapHub = PlaybackTapHub()
 
+    /// Per-subscriber fan-out of queue snapshots (protocol section 9);
+    /// `queueSnapshotUpdates()` and `emitQueueSnapshot()` live in
+    /// `QueuePlayer+PlaybackTap.swift`, fed from the single `changes()`
+    /// consumer so they never compete for the stream.
+    var queueSnapshotHub = QueueSnapshotHub()
+
     /// Emits the set of queue-item IDs whose backing files are missing: the
     /// current set first, then again whenever availability is recomputed
     /// (currently after `restoreQueue`). The UI observes this to render

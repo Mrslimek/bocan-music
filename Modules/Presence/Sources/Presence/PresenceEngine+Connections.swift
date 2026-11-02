@@ -230,6 +230,18 @@ extension PresenceEngine {
                 "note": "post-handshake snapshot",
             ])
         }
+        // Queue sharing (contract section 9): the post-handshake queue
+        // snapshot, alongside the initial state_update.
+        if let queue = await self.queueMessageForSending() {
+            await connection.sendQueue(queue)
+            self.log.debug("presence.queue_sent", [
+                "peer": peerID,
+                "entries": String(queue.hashes?.count ?? 0),
+                "current": queue.current.map(String.init) ?? "-",
+                "note": "post-handshake snapshot",
+            ])
+            self.lastQueueFingerprint = QueueFingerprint(hashes: queue.hashes ?? [], current: queue.current)
+        }
         self.publishSnapshot()
     }
 

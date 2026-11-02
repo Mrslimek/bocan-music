@@ -10,6 +10,7 @@ extension QueuePlayer {
 
     func subscribeToQueueChanges(stream: AsyncStream<QueueChange>) async {
         for await _ in stream {
+            await self.emitQueueSnapshot()
             let items = await queue.items
             let currentIndex = await queue.currentIndex
             let repeatMode = await queue.repeatMode

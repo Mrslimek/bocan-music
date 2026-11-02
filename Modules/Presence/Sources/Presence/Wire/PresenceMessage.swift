@@ -81,6 +81,23 @@ public enum PresenceCommandAction: String, Sendable, Equatable, CaseIterable {
     case shuffleOff = "shuffle_off"
 }
 
+/// A decoded `queue` message (contract section 9, added 2026-11-02): the
+/// sender's playback queue as an ordered array of lowercase-hex SHA-256 track
+/// hashes, plus the 0-based index of the currently-playing entry (nil when
+/// nothing in the array is playing). `hashes` is left unvalidated at the type
+/// level so the engine owns the tolerant-receiver malformed decision.
+public struct PresenceQueueMessage: Sendable, Equatable {
+    public let current: Int?
+    /// nil means the payload was not a valid string array (absent key, non-array,
+    /// or non-string entries) — the engine logs `message_malformed`.
+    public let hashes: [String]?
+
+    public init(current: Int?, hashes: [String]?) {
+        self.current = current
+        self.hashes = hashes
+    }
+}
+
 /// A decoded `command` message. `action` keeps the wire string so foreign
 /// peers sending unknown actions surface as `command_ignored
 /// reason=unsupported` instead of malformed frames; `positionSec` is required
@@ -118,6 +135,7 @@ public enum PresenceMessage: Sendable, Equatable {
     case stateUpdate(PresencePlaybackState)
     case test(text: String)
     case command(PresenceCommand)
+    case queue(PresenceQueueMessage)
     case goodbye(reason: String)
 
     public var type: String {
@@ -142,6 +160,9 @@ public enum PresenceMessage: Sendable, Equatable {
 
         case .command:
             "command"
+
+        case .queue:
+            "queue"
 
         case .goodbye:
             "goodbye"
